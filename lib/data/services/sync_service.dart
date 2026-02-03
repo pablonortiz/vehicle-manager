@@ -10,6 +10,9 @@ import '../../domain/models/maintenance.dart';
 import '../../domain/models/vehicle_note.dart';
 import '../../domain/models/vehicle_photo.dart';
 import '../../domain/models/document_photo.dart';
+import '../../domain/models/city.dart';
+import '../../domain/models/lugar.dart';
+import '../../domain/models/fuel_charge.dart';
 
 enum SyncStatus {
   idle,
@@ -95,6 +98,30 @@ class SyncService extends StateNotifier<SyncState> {
         await _db.clearAllTables();
         debugPrint('🗑️ [SYNC] Tablas locales limpiadas');
 
+        // Descargar ciudades primero (antes de vehículos por la FK)
+        try {
+          final citiesData = await client.from('cities').select();
+          for (final data in citiesData) {
+            final city = City.fromSupabase(data);
+            await db.insert('cities', {...city.toMap(), 'synced': 1});
+          }
+          debugPrint('✅ [SYNC] ${citiesData.length} ciudades guardadas localmente');
+        } catch (e) {
+          debugPrint('⚠️ [SYNC] Tabla cities no existe aún: $e');
+        }
+
+        // Descargar lugares
+        try {
+          final lugaresData = await client.from('lugares').select();
+          for (final data in lugaresData) {
+            final lugar = Lugar.fromSupabase(data);
+            await db.insert('lugares', {...lugar.toMap(), 'synced': 1});
+          }
+          debugPrint('✅ [SYNC] ${lugaresData.length} lugares guardados localmente');
+        } catch (e) {
+          debugPrint('⚠️ [SYNC] Tabla lugares no existe aún: $e');
+        }
+
         // Descargar vehículos
         for (final data in vehiclesData) {
           final vehicle = Vehicle.fromSupabase(data);
@@ -156,6 +183,18 @@ class SyncService extends StateNotifier<SyncState> {
         } catch (e) {
           debugPrint('⚠️ [SYNC] Tabla document_photos no existe aún: $e');
         }
+
+        // Descargar cargas de combustible
+        try {
+          final fuelChargesData = await client.from('fuel_charges').select();
+          for (final data in fuelChargesData) {
+            final fuelCharge = FuelCharge.fromSupabase(data);
+            await db.insert('fuel_charges', {...fuelCharge.toMap(), 'synced': 1});
+          }
+          debugPrint('✅ [SYNC] ${fuelChargesData.length} cargas de combustible');
+        } catch (e) {
+          debugPrint('⚠️ [SYNC] Tabla fuel_charges no existe aún: $e');
+        }
       }
 
       debugPrint('✅ [SYNC] Sincronización completa exitosa');
@@ -178,7 +217,69 @@ class SyncService extends StateNotifier<SyncState> {
   Future<void> _uploadUnsyncedData() async {
     final db = await _db.database;
     final client = SupabaseConfig.client;
-    
+
+    // Subir ciudades no sincronizadas primero (antes de vehículos por la FK)
+    try {
+      final unsyncedCities = await db.query('cities', where: 'synced = 0');
+      debugPrint('📤 [SYNC] ${unsyncedCities.length} ciudades pendientes de sincronizar');
+
+      for (final map in unsyncedCities) {
+        try {
+          final city = City.fromMap(map);
+          final existing = await client
+              .from('cities')
+              .select('id')
+              .eq('id', city.id!)
+              .maybeSingle();
+
+          if (existing == null) {
+            await client.from('cities').insert(city.toSupabase());
+            debugPrint('✅ [SYNC] Ciudad ${city.name} insertada en Supabase');
+          } else {
+            await client.from('cities').update(city.toSupabase()).eq('id', city.id!);
+            debugPrint('✅ [SYNC] Ciudad ${city.name} actualizada en Supabase');
+          }
+
+          await db.update('cities', {'synced': 1}, where: 'id = ?', whereArgs: [city.id]);
+        } catch (e) {
+          debugPrint('❌ [SYNC] Error subiendo ciudad: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [SYNC] Tabla cities no existe localmente: $e');
+    }
+
+    // Subir lugares no sincronizados
+    try {
+      final unsyncedLugares = await db.query('lugares', where: 'synced = 0');
+      debugPrint('📤 [SYNC] ${unsyncedLugares.length} lugares pendientes de sincronizar');
+
+      for (final map in unsyncedLugares) {
+        try {
+          final lugar = Lugar.fromMap(map);
+          final existing = await client
+              .from('lugares')
+              .select('id')
+              .eq('id', lugar.id!)
+              .maybeSingle();
+
+          if (existing == null) {
+            await client.from('lugares').insert(lugar.toSupabase());
+            debugPrint('✅ [SYNC] Lugar ${lugar.name} insertado en Supabase');
+          } else {
+            await client.from('lugares').update(lugar.toSupabase()).eq('id', lugar.id!);
+            debugPrint('✅ [SYNC] Lugar ${lugar.name} actualizado en Supabase');
+          }
+
+          await db.update('lugares', {'synced': 1}, where: 'id = ?', whereArgs: [lugar.id]);
+        } catch (e) {
+          debugPrint('❌ [SYNC] Error subiendo lugar: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [SYNC] Tabla lugares no existe localmente: $e');
+    }
+
     // Subir vehículos no sincronizados
     final unsyncedVehicles = await db.query('vehicles', where: 'synced = 0');
     debugPrint('📤 [SYNC] ${unsyncedVehicles.length} vehículos pendientes de sincronizar');
@@ -222,7 +323,7 @@ class SyncService extends StateNotifier<SyncState> {
             .select('id')
             .eq('id', history.id!)
             .maybeSingle();
-        
+
         if (existing == null) {
           await client.from('vehicle_history').insert(history.toSupabase());
         }
@@ -230,6 +331,37 @@ class SyncService extends StateNotifier<SyncState> {
       } catch (e) {
         debugPrint('❌ [SYNC] Error subiendo historial: $e');
       }
+    }
+
+    // Subir cargas de combustible no sincronizadas
+    try {
+      final unsyncedFuelCharges = await db.query('fuel_charges', where: 'synced = 0');
+      debugPrint('📤 [SYNC] ${unsyncedFuelCharges.length} cargas de combustible pendientes de sincronizar');
+
+      for (final map in unsyncedFuelCharges) {
+        try {
+          final fuelCharge = FuelCharge.fromMap(map);
+          final existing = await client
+              .from('fuel_charges')
+              .select('id')
+              .eq('id', fuelCharge.id!)
+              .maybeSingle();
+
+          if (existing == null) {
+            await client.from('fuel_charges').insert(fuelCharge.toSupabase());
+            debugPrint('✅ [SYNC] Carga de combustible insertada en Supabase');
+          } else {
+            await client.from('fuel_charges').update(fuelCharge.toSupabase()).eq('id', fuelCharge.id!);
+            debugPrint('✅ [SYNC] Carga de combustible actualizada en Supabase');
+          }
+
+          await db.update('fuel_charges', {'synced': 1}, where: 'id = ?', whereArgs: [fuelCharge.id]);
+        } catch (e) {
+          debugPrint('❌ [SYNC] Error subiendo carga de combustible: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [SYNC] Tabla fuel_charges no existe localmente: $e');
     }
   }
 

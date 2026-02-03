@@ -5,7 +5,9 @@ import '../../core/config/supabase_config.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/services/sync_service.dart';
+import '../../domain/models/city.dart';
 import '../providers/vehicle_provider.dart';
+import '../providers/location_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -208,7 +210,11 @@ class HomeScreen extends ConsumerWidget {
                         province: province,
                         vehicleCount: count,
                         onTap: () {
-                          context.go('/vehicles?provinceId=${province.id}');
+                          ref.read(locationFilterProvider.notifier).setProvince(province.id);
+                          context.go('/vehicles');
+                        },
+                        onLongPress: () {
+                          _showCitiesInProvince(context, ref, province);
                         },
                       );
                     },
@@ -241,6 +247,118 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showCitiesInProvince(BuildContext context, WidgetRef ref, Province province) {
+    final citiesAsync = ref.read(citiesByProvinceProvider(province.id));
+    final countsAsync = ref.read(vehicleCountByCityProvider(province.id));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Ciudades en ${province.name}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: citiesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => const Center(child: Text('Error cargando ciudades')),
+                data: (cities) {
+                  if (cities.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text(
+                        'No hay ciudades registradas en esta provincia',
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+
+                  return countsAsync.when(
+                    loading: () => _buildCityList(sheetContext, ref, province, cities, {}),
+                    error: (_, __) => _buildCityList(sheetContext, ref, province, cities, {}),
+                    data: (counts) => _buildCityList(sheetContext, ref, province, cities, counts),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCityList(
+    BuildContext context,
+    WidgetRef ref,
+    Province province,
+    List<City> cities,
+    Map<String, int> counts,
+  ) {
+    return ListView.builder(
+      shrinkWrap: true,
+      itemCount: cities.length,
+      itemBuilder: (context, index) {
+        final city = cities[index];
+        final count = counts[city.id] ?? 0;
+
+        return ListTile(
+          leading: const Icon(Icons.location_city),
+          title: Text(city.name),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (count > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentPrimary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentPrimary,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            ref.read(locationFilterProvider.notifier).setProvince(province.id);
+            ref.read(locationFilterProvider.notifier).setCity(city.id);
+            GoRouter.of(context).go('/vehicles');
+          },
+        );
+      },
     );
   }
 
@@ -396,19 +514,22 @@ class _ProvinceCard extends StatelessWidget {
   final Province province;
   final int vehicleCount;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _ProvinceCard({
     required this.province,
     required this.vehicleCount,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasVehicles = vehicleCount > 0;
-    
+
     return GestureDetector(
       onTap: onTap,
+      onLongPress: hasVehicles ? onLongPress : null,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

@@ -10,7 +10,10 @@ import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
+import '../providers/location_provider.dart';
 import '../widgets/vehicle_icon.dart';
+import '../widgets/city_autocomplete.dart';
+import '../widgets/lugar_autocomplete.dart';
 
 class VehicleFormScreen extends ConsumerStatefulWidget {
   final String? vehicleId;
@@ -23,7 +26,9 @@ class VehicleFormScreen extends ConsumerStatefulWidget {
 
 class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+  final _cityAutocompleteKey = GlobalKey<CityAutocompleteState>();
+  final _lugarAutocompleteKey = GlobalKey<LugarAutocompleteState>();
+
   late TextEditingController _plateController;
   late TextEditingController _brandController;
   late TextEditingController _modelController;
@@ -31,6 +36,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
   late TextEditingController _kmController;
   late TextEditingController _insuranceCompanyController;
   late TextEditingController _cityController;
+  late TextEditingController _lugarController;
   late TextEditingController _responsibleNameController;
   late TextEditingController _responsiblePhoneController;
 
@@ -39,6 +45,8 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
   FuelType _selectedFuelType = FuelType.nafta;
   VehicleStatus _selectedStatus = VehicleStatus.available;
   int _selectedProvinceId = 1;
+  String? _selectedCityId;
+  String? _selectedLugarId;
   DateTime? _vtvExpiry;
   DateTime? _insuranceExpiry;
 
@@ -55,6 +63,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     _kmController = TextEditingController(text: '0');
     _insuranceCompanyController = TextEditingController();
     _cityController = TextEditingController();
+    _lugarController = TextEditingController();
     _responsibleNameController = TextEditingController();
     _responsiblePhoneController = TextEditingController();
 
@@ -79,6 +88,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _kmController.text = vehicle.km.toString();
         _insuranceCompanyController.text = vehicle.insuranceCompany ?? '';
         _cityController.text = vehicle.city;
+        _lugarController.text = vehicle.lugar ?? '';
         _responsibleNameController.text = vehicle.responsibleName;
         _responsiblePhoneController.text = vehicle.responsiblePhone;
         _selectedType = vehicle.type;
@@ -86,6 +96,8 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _selectedFuelType = vehicle.fuelType;
         _selectedStatus = vehicle.status;
         _selectedProvinceId = vehicle.provinceId;
+        _selectedCityId = vehicle.cityId;
+        _selectedLugarId = vehicle.lugarId;
         _vtvExpiry = vehicle.vtvExpiry;
         _insuranceExpiry = vehicle.insuranceExpiry;
       });
@@ -101,6 +113,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     _kmController.dispose();
     _insuranceCompanyController.dispose();
     _cityController.dispose();
+    _lugarController.dispose();
     _responsibleNameController.dispose();
     _responsiblePhoneController.dispose();
     super.dispose();
@@ -416,23 +429,74 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                         );
                       }).toList(),
                       onChanged: (value) {
-                        if (value != null) setState(() => _selectedProvinceId = value);
+                        if (value != null) {
+                          setState(() {
+                            _selectedProvinceId = value;
+                            // Clear city and lugar when province changes
+                            _cityController.clear();
+                            _lugarController.clear();
+                            _selectedCityId = null;
+                            _selectedLugarId = null;
+                          });
+                        }
                       },
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
+                    CityAutocomplete(
+                      key: _cityAutocompleteKey,
                       controller: _cityController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Ciudad *',
-                        hintText: 'Ej: Córdoba Capital',
-                        prefixIcon: Icon(Icons.location_city),
-                      ),
+                      provinceId: _selectedProvinceId,
+                      initialCityId: _selectedCityId,
+                      onCitySelected: (city) {
+                        setState(() {
+                          _selectedCityId = city.id;
+                          // Clear lugar when city changes
+                          _lugarController.clear();
+                          _selectedLugarId = null;
+                        });
+                      },
+                      onCityTextChanged: (text) {
+                        // If user types something different, clear the selection
+                        if (_selectedCityId != null) {
+                          final cityAutocomplete = _cityAutocompleteKey.currentState;
+                          if (cityAutocomplete != null && !cityAutocomplete.hasMatchingCity) {
+                            setState(() {
+                              _selectedCityId = null;
+                              _lugarController.clear();
+                              _selectedLugarId = null;
+                            });
+                          }
+                        }
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Ingresá la ciudad';
                         }
                         return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    LugarAutocomplete(
+                      key: _lugarAutocompleteKey,
+                      controller: _lugarController,
+                      cityId: _selectedCityId,
+                      initialLugarId: _selectedLugarId,
+                      // Pass city text when creating new city (cityId is null but text is entered)
+                      pendingCityText: _selectedCityId == null ? _cityController.text : null,
+                      onLugarSelected: (lugar) {
+                        setState(() {
+                          _selectedLugarId = lugar.id;
+                        });
+                      },
+                      onLugarTextChanged: (text) {
+                        if (_selectedLugarId != null) {
+                          final lugarAutocomplete = _lugarAutocompleteKey.currentState;
+                          if (lugarAutocomplete != null && !lugarAutocomplete.hasMatchingLugar) {
+                            setState(() {
+                              _selectedLugarId = null;
+                            });
+                          }
+                        }
                       },
                     ),
                     const SizedBox(height: 24),
@@ -547,56 +611,101 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
     setState(() => _isLoading = true);
 
-    final vehicle = Vehicle(
-      id: widget.vehicleId,
-      plate: _plateController.text.trim().toUpperCase(),
-      type: _selectedType,
-      brand: _brandController.text.trim(),
-      model: _modelController.text.trim(),
-      year: int.parse(_yearController.text),
-      color: _selectedColor,
-      km: int.tryParse(_kmController.text) ?? 0,
-      vtvExpiry: _vtvExpiry,
-      insuranceCompany: _insuranceCompanyController.text.trim().isEmpty
-          ? null
-          : _insuranceCompanyController.text.trim(),
-      insuranceExpiry: _insuranceExpiry,
-      fuelType: _selectedFuelType,
-      status: _selectedStatus,
-      provinceId: _selectedProvinceId,
-      city: _cityController.text.trim(),
-      responsibleName: _responsibleNameController.text.trim(),
-      responsiblePhone: _responsiblePhoneController.text.trim(),
-    );
+    try {
+      // Get or create city
+      String? cityId = _selectedCityId;
+      final cityText = _cityController.text.trim();
+      bool createdNewCity = false;
+      if (cityText.isNotEmpty && cityId == null) {
+        final locationRepo = ref.read(locationRepositoryProvider);
+        final city = await locationRepo.getOrCreateCity(_selectedProvinceId, cityText);
+        cityId = city.id;
+        createdNewCity = true;
+      }
 
-    bool success;
-    if (_isEditing) {
-      success = await ref
-          .read(vehicleNotifierProvider.notifier)
-          .updateVehicle(vehicle);
-    } else {
-      final id = await ref
-          .read(vehicleNotifierProvider.notifier)
-          .addVehicle(vehicle);
-      success = id != null;
-    }
+      // Get or create lugar (optional)
+      String? lugarId = _selectedLugarId;
+      final lugarText = _lugarController.text.trim();
+      bool createdNewLugar = false;
+      if (lugarText.isNotEmpty && lugarId == null && cityId != null) {
+        final locationRepo = ref.read(locationRepositoryProvider);
+        final lugar = await locationRepo.getOrCreateLugar(cityId, lugarText);
+        lugarId = lugar.id;
+        createdNewLugar = true;
+      }
 
-    setState(() => _isLoading = false);
+      // Invalidate location providers if we created new city/lugar
+      if (createdNewCity) {
+        ref.invalidate(citiesByProvinceProvider(_selectedProvinceId));
+      }
+      if (createdNewLugar && cityId != null) {
+        ref.invalidate(lugaresByCityProvider(cityId));
+      }
 
-    if (mounted) {
-      if (success) {
-        context.pop();
+      final vehicle = Vehicle(
+        id: widget.vehicleId,
+        plate: _plateController.text.trim().toUpperCase(),
+        type: _selectedType,
+        brand: _brandController.text.trim(),
+        model: _modelController.text.trim(),
+        year: int.parse(_yearController.text),
+        color: _selectedColor,
+        km: int.tryParse(_kmController.text) ?? 0,
+        vtvExpiry: _vtvExpiry,
+        insuranceCompany: _insuranceCompanyController.text.trim().isEmpty
+            ? null
+            : _insuranceCompanyController.text.trim(),
+        insuranceExpiry: _insuranceExpiry,
+        fuelType: _selectedFuelType,
+        status: _selectedStatus,
+        provinceId: _selectedProvinceId,
+        city: cityText,
+        cityId: cityId,
+        lugarId: lugarId,
+        lugar: lugarText.isEmpty ? null : lugarText,
+        responsibleName: _responsibleNameController.text.trim(),
+        responsiblePhone: _responsiblePhoneController.text.trim(),
+      );
+
+      bool success;
+      if (_isEditing) {
+        success = await ref
+            .read(vehicleNotifierProvider.notifier)
+            .updateVehicle(vehicle);
+      } else {
+        final id = await ref
+            .read(vehicleNotifierProvider.notifier)
+            .addVehicle(vehicle);
+        success = id != null;
+      }
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        if (success) {
+          context.pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isEditing
+                  ? 'Vehículo actualizado'
+                  : 'Vehículo agregado'),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error al guardar. ¿La patente ya existe?'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing 
-                ? 'Vehículo actualizado' 
-                : 'Vehículo agregado'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al guardar. ¿La patente ya existe?'),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: AppTheme.error,
           ),
         );

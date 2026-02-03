@@ -67,12 +67,94 @@ class VehicleRepository {
           .order('updated_at', ascending: false);
       return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
     }
-    
+
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
       where: 'status = ?',
       whereArgs: [statusIndex],
+      orderBy: 'updated_at DESC',
+    );
+    return maps.map((map) => Vehicle.fromMap(map)).toList();
+  }
+
+  Future<List<Vehicle>> getVehiclesByCity(String cityId) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      final data = await SupabaseConfig.client.from('vehicles')
+          .select()
+          .eq('city_id', cityId)
+          .order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      'vehicles',
+      where: 'city_id = ?',
+      whereArgs: [cityId],
+      orderBy: 'updated_at DESC',
+    );
+    return maps.map((map) => Vehicle.fromMap(map)).toList();
+  }
+
+  Future<List<Vehicle>> getVehiclesByLugar(String lugarId) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      final data = await SupabaseConfig.client.from('vehicles')
+          .select()
+          .eq('lugar_id', lugarId)
+          .order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      'vehicles',
+      where: 'lugar_id = ?',
+      whereArgs: [lugarId],
+      orderBy: 'updated_at DESC',
+    );
+    return maps.map((map) => Vehicle.fromMap(map)).toList();
+  }
+
+  /// Get vehicles filtered by province, city, and/or lugar
+  Future<List<Vehicle>> getVehiclesFiltered({
+    int? provinceId,
+    String? cityId,
+    String? lugarId,
+  }) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      var query = SupabaseConfig.client.from('vehicles').select();
+      if (provinceId != null) query = query.eq('province_id', provinceId);
+      if (cityId != null) query = query.eq('city_id', cityId);
+      if (lugarId != null) query = query.eq('lugar_id', lugarId);
+      final data = await query.order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+
+    final db = await _dbHelper.database;
+    final List<String> conditions = [];
+    final List<dynamic> args = [];
+
+    if (provinceId != null) {
+      conditions.add('province_id = ?');
+      args.add(provinceId);
+    }
+    if (cityId != null) {
+      conditions.add('city_id = ?');
+      args.add(cityId);
+    }
+    if (lugarId != null) {
+      conditions.add('lugar_id = ?');
+      args.add(lugarId);
+    }
+
+    final maps = await db.query(
+      'vehicles',
+      where: conditions.isNotEmpty ? conditions.join(' AND ') : null,
+      whereArgs: args.isNotEmpty ? args : null,
       orderBy: 'updated_at DESC',
     );
     return maps.map((map) => Vehicle.fromMap(map)).toList();
@@ -290,17 +372,18 @@ class VehicleRepository {
   Future<List<Vehicle>> searchVehicles(String query) async {
     final db = await _dbHelper.database;
     final searchQuery = '%${query.toLowerCase()}%';
-    
+
     final maps = await db.rawQuery('''
-      SELECT * FROM vehicles 
-      WHERE LOWER(plate) LIKE ? 
-         OR LOWER(brand) LIKE ? 
-         OR LOWER(model) LIKE ? 
+      SELECT * FROM vehicles
+      WHERE LOWER(plate) LIKE ?
+         OR LOWER(brand) LIKE ?
+         OR LOWER(model) LIKE ?
          OR LOWER(responsible_name) LIKE ?
          OR LOWER(city) LIKE ?
+         OR LOWER(lugar) LIKE ?
       ORDER BY updated_at DESC
-    ''', [searchQuery, searchQuery, searchQuery, searchQuery, searchQuery]);
-    
+    ''', [searchQuery, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery]);
+
     return maps.map((map) => Vehicle.fromMap(map)).toList();
   }
 
@@ -463,7 +546,17 @@ class VehicleRepository {
         newValue: newVehicle.city,
       ));
     }
-    
+
+    if (oldVehicle.lugar != newVehicle.lugar) {
+      changes.add(VehicleHistory(
+        id: _uuid.v4(),
+        vehicleId: newVehicle.id!,
+        field: 'lugar',
+        oldValue: oldVehicle.lugar ?? 'Sin lugar',
+        newValue: newVehicle.lugar ?? 'Sin lugar',
+      ));
+    }
+
     if (oldVehicle.responsibleName != newVehicle.responsibleName) {
       changes.add(VehicleHistory(
         id: _uuid.v4(),

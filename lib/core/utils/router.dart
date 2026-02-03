@@ -7,6 +7,7 @@ import '../../presentation/screens/vehicle_form_screen.dart';
 import '../../presentation/screens/vehicle_history_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/search_screen.dart';
+import '../../presentation/screens/fuel_charges_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -73,6 +74,14 @@ final router = GoRouter(
       builder: (context, state) {
         final id = state.pathParameters['id']!;
         return VehicleHistoryScreen(vehicleId: id);
+      },
+    ),
+    GoRoute(
+      path: '/vehicle/:id/fuel',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return FuelChargesScreen(vehicleId: id);
       },
     ),
     GoRoute(

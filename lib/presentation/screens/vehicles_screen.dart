@@ -8,7 +8,9 @@ import '../../core/theme/app_theme.dart';
 import '../../data/services/sync_service.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
+import '../providers/location_provider.dart';
 import '../widgets/vehicle_icon.dart';
+import '../widgets/hierarchical_filter_sheet.dart';
 
 class VehiclesScreen extends ConsumerStatefulWidget {
   final int? provinceId;
@@ -27,7 +29,7 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
     super.initState();
     if (widget.provinceId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(selectedProvinceProvider.notifier).state = widget.provinceId;
+        ref.read(locationFilterProvider.notifier).setProvince(widget.provinceId);
       });
     }
   }
@@ -41,14 +43,14 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedProvince = ref.watch(selectedProvinceProvider);
-    final vehiclesAsync = ref.watch(vehiclesBySelectedProvinceProvider);
+    final locationFilter = ref.watch(locationFilterProvider);
+    final vehiclesAsync = ref.watch(vehiclesByLocationFilterProvider);
 
     // Listen for sync completion and refresh data automatically
     ref.listen<SyncState>(syncServiceProvider, (previous, next) {
       if (previous?.status == SyncStatus.syncing &&
           next.status == SyncStatus.success) {
-        ref.invalidate(vehiclesBySelectedProvinceProvider);
+        ref.invalidate(vehiclesByLocationFilterProvider);
         ref.invalidate(vehicleNotifierProvider);
       }
     });
@@ -73,16 +75,8 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                           color: AppTheme.textPrimary,
                         ),
                       ),
-                      if (selectedProvince != null)
-                        Text(
-                          ArgentinaProvinces.getById(selectedProvince).name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.accentPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      if (locationFilter.hasFilter)
+                        _LocationFilterLabel(locationFilter: locationFilter),
                     ],
                   ),
                 ),
@@ -94,9 +88,9 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                       icon: const Icon(Icons.search, color: AppTheme.accentPrimary),
                     ),
                     IconButton(
-                      onPressed: () => _showFilters(context),
+                      onPressed: () => showHierarchicalFilterSheet(context),
                       icon: Badge(
-                        isLabelVisible: selectedProvince != null || _statusFilter != null,
+                        isLabelVisible: locationFilter.hasFilter || _statusFilter != null,
                         child: const Icon(Icons.filter_list, color: AppTheme.accentPrimary),
                       ),
                     ),
@@ -150,9 +144,9 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.5,
                           child: _EmptyState(
-                            hasFilter: selectedProvince != null || _statusFilter != null,
+                            hasFilter: locationFilter.hasFilter || _statusFilter != null,
                             onClearFilters: () {
-                              ref.read(selectedProvinceProvider.notifier).state = null;
+                              ref.read(locationFilterProvider.notifier).clearAll();
                               setState(() => _statusFilter = null);
                             },
                           ),
@@ -188,103 +182,47 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
     );
   }
 
-  void _showFilters(BuildContext context) {
-    final selectedProvince = ref.read(selectedProvinceProvider);
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+}
+
+class _LocationFilterLabel extends ConsumerWidget {
+  final LocationFilter locationFilter;
+
+  const _LocationFilterLabel({required this.locationFilter});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final parts = <String>[];
+
+    if (locationFilter.provinceId != null) {
+      parts.add(ArgentinaProvinces.getById(locationFilter.provinceId!).name);
+    }
+
+    if (locationFilter.cityId != null) {
+      final cityAsync = ref.watch(cityByIdProvider(locationFilter.cityId!));
+      cityAsync.whenData((city) {
+        if (city != null && !parts.contains(city.name)) {
+          parts.add(city.name);
+        }
+      });
+    }
+
+    if (locationFilter.lugarId != null) {
+      final lugarAsync = ref.watch(lugarByIdProvider(locationFilter.lugarId!));
+      lugarAsync.whenData((lugar) {
+        if (lugar != null && !parts.contains(lugar.name)) {
+          parts.add(lugar.name);
+        }
+      });
+    }
+
+    return Text(
+      parts.join(' > '),
+      style: const TextStyle(
+        fontSize: 14,
+        color: AppTheme.accentPrimary,
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filtrar por Provincia',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (selectedProvince != null)
-                      TextButton(
-                        onPressed: () {
-                          ref.read(selectedProvinceProvider.notifier).state = null;
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Limpiar'),
-                      ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: ArgentinaProvinces.all.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return ListTile(
-                        leading: const Icon(Icons.public),
-                        title: const Text('Todas las provincias'),
-                        trailing: selectedProvince == null
-                            ? const Icon(Icons.check, color: AppTheme.accentPrimary)
-                            : null,
-                        onTap: () {
-                          ref.read(selectedProvinceProvider.notifier).state = null;
-                          Navigator.pop(context);
-                        },
-                      );
-                    }
-                    
-                    final province = ArgentinaProvinces.all[index - 1];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: AppTheme.surfaceLight,
-                        child: Text(
-                          province.abbreviation,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      title: Text(province.name),
-                      trailing: selectedProvince == province.id
-                          ? const Icon(Icons.check, color: AppTheme.accentPrimary)
-                          : null,
-                      onTap: () {
-                        ref.read(selectedProvinceProvider.notifier).state = province.id;
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

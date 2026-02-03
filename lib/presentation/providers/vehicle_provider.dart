@@ -9,6 +9,7 @@ import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/vehicle_note.dart';
 import '../../domain/models/vehicle_photo.dart';
+import 'location_provider.dart';
 
 // Repository providers
 final vehicleRepositoryProvider = Provider((ref) {
@@ -212,9 +213,84 @@ final selectedProvinceProvider = StateProvider<int?>((ref) => null);
 final vehiclesBySelectedProvinceProvider = Provider<AsyncValue<List<Vehicle>>>((ref) {
   final selectedProvince = ref.watch(selectedProvinceProvider);
   final vehiclesAsync = ref.watch(vehicleNotifierProvider);
-  
+
   return vehiclesAsync.whenData((vehicles) {
     if (selectedProvince == null) return vehicles;
     return vehicles.where((v) => v.provinceId == selectedProvince).toList();
+  });
+});
+
+// Vehículos por ciudad
+final vehiclesByCityProvider = FutureProvider.family<List<Vehicle>, String>((ref, cityId) async {
+  final repository = ref.watch(vehicleRepositoryProvider);
+  return repository.getVehiclesByCity(cityId);
+});
+
+// Vehículos por lugar
+final vehiclesByLugarProvider = FutureProvider.family<List<Vehicle>, String>((ref, lugarId) async {
+  final repository = ref.watch(vehicleRepositoryProvider);
+  return repository.getVehiclesByLugar(lugarId);
+});
+
+// Vehículos filtrados por jerarquía de ubicación (provincia -> ciudad -> lugar)
+final vehiclesByLocationFilterProvider = Provider<AsyncValue<List<Vehicle>>>((ref) {
+  final locationFilter = ref.watch(locationFilterProvider);
+  final vehiclesAsync = ref.watch(vehicleNotifierProvider);
+
+  return vehiclesAsync.whenData((vehicles) {
+    var filtered = vehicles;
+
+    if (locationFilter.provinceId != null) {
+      filtered = filtered.where((v) => v.provinceId == locationFilter.provinceId).toList();
+    }
+
+    if (locationFilter.cityId != null) {
+      filtered = filtered.where((v) => v.cityId == locationFilter.cityId).toList();
+    }
+
+    if (locationFilter.lugarId != null) {
+      filtered = filtered.where((v) => v.lugarId == locationFilter.lugarId).toList();
+    }
+
+    return filtered;
+  });
+});
+
+// Combined filter: search + location
+final filteredBySearchAndLocationProvider = Provider<AsyncValue<List<Vehicle>>>((ref) {
+  final query = ref.watch(searchQueryProvider);
+  final locationFilter = ref.watch(locationFilterProvider);
+  final vehiclesAsync = ref.watch(vehicleNotifierProvider);
+
+  return vehiclesAsync.whenData((vehicles) {
+    var filtered = vehicles;
+
+    // Apply location filter
+    if (locationFilter.provinceId != null) {
+      filtered = filtered.where((v) => v.provinceId == locationFilter.provinceId).toList();
+    }
+
+    if (locationFilter.cityId != null) {
+      filtered = filtered.where((v) => v.cityId == locationFilter.cityId).toList();
+    }
+
+    if (locationFilter.lugarId != null) {
+      filtered = filtered.where((v) => v.lugarId == locationFilter.lugarId).toList();
+    }
+
+    // Apply search filter
+    if (query.isNotEmpty) {
+      final lowerQuery = query.toLowerCase();
+      filtered = filtered.where((v) =>
+        v.plate.toLowerCase().contains(lowerQuery) ||
+        v.brand.toLowerCase().contains(lowerQuery) ||
+        v.model.toLowerCase().contains(lowerQuery) ||
+        v.responsibleName.toLowerCase().contains(lowerQuery) ||
+        v.city.toLowerCase().contains(lowerQuery) ||
+        (v.lugar?.toLowerCase().contains(lowerQuery) ?? false)
+      ).toList();
+    }
+
+    return filtered;
   });
 });

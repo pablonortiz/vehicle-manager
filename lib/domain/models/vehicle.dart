@@ -17,6 +17,9 @@ class Vehicle {
   final VehicleStatus status;
   final int provinceId;
   final String city;
+  final String? cityId;
+  final String? lugarId;
+  final String? lugar;
   final String responsibleName;
   final String responsiblePhone;
   final DateTime createdAt;
@@ -38,6 +41,9 @@ class Vehicle {
     required this.status,
     required this.provinceId,
     required this.city,
+    this.cityId,
+    this.lugarId,
+    this.lugar,
     required this.responsibleName,
     required this.responsiblePhone,
     DateTime? createdAt,
@@ -61,6 +67,9 @@ class Vehicle {
     VehicleStatus? status,
     int? provinceId,
     String? city,
+    String? cityId,
+    String? lugarId,
+    String? lugar,
     String? responsibleName,
     String? responsiblePhone,
     DateTime? createdAt,
@@ -82,6 +91,9 @@ class Vehicle {
       status: status ?? this.status,
       provinceId: provinceId ?? this.provinceId,
       city: city ?? this.city,
+      cityId: cityId ?? this.cityId,
+      lugarId: lugarId ?? this.lugarId,
+      lugar: lugar ?? this.lugar,
       responsibleName: responsibleName ?? this.responsibleName,
       responsiblePhone: responsiblePhone ?? this.responsiblePhone,
       createdAt: createdAt ?? this.createdAt,
@@ -107,6 +119,9 @@ class Vehicle {
       'status': status.index,
       'province_id': provinceId,
       'city': city,
+      'city_id': cityId,
+      'lugar_id': lugarId,
+      'lugar': lugar,
       'responsible_name': responsibleName,
       'responsible_phone': responsiblePhone,
       'created_at': createdAt.millisecondsSinceEpoch,
@@ -135,6 +150,9 @@ class Vehicle {
       status: VehicleStatus.values[map['status'] as int],
       provinceId: map['province_id'] as int,
       city: map['city'] as String,
+      cityId: map['city_id'] as String?,
+      lugarId: map['lugar_id'] as String?,
+      lugar: map['lugar'] as String?,
       responsibleName: map['responsible_name'] as String,
       responsiblePhone: map['responsible_phone'] as String,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
@@ -160,6 +178,9 @@ class Vehicle {
       'status': status.index,
       'province_id': provinceId,
       'city': city,
+      'city_id': cityId,
+      'lugar_id': lugarId,
+      'lugar': lugar,
       'responsible_name': responsibleName,
       'responsible_phone': responsiblePhone,
     };
@@ -186,6 +207,9 @@ class Vehicle {
       status: VehicleStatus.values[map['status'] as int],
       provinceId: map['province_id'] as int,
       city: map['city'] as String,
+      cityId: map['city_id'] as String?,
+      lugarId: map['lugar_id'] as String?,
+      lugar: map['lugar'] as String?,
       responsibleName: map['responsible_name'] as String,
       responsiblePhone: map['responsible_phone'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
@@ -211,6 +235,9 @@ class Vehicle {
       'status': status.name,
       'provinceId': provinceId,
       'city': city,
+      'cityId': cityId,
+      'lugarId': lugarId,
+      'lugar': lugar,
       'responsibleName': responsibleName,
       'responsiblePhone': responsiblePhone,
       'createdAt': createdAt.toIso8601String(),
@@ -239,6 +266,9 @@ class Vehicle {
       status: VehicleStatus.values.firstWhere((e) => e.name == json['status']),
       provinceId: json['provinceId'] as int,
       city: json['city'] as String,
+      cityId: json['cityId'] as String?,
+      lugarId: json['lugarId'] as String?,
+      lugar: json['lugar'] as String?,
       responsibleName: json['responsibleName'] as String,
       responsiblePhone: json['responsiblePhone'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),

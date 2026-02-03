@@ -205,6 +205,8 @@ class PdfService {
               _buildSection('UBICACIÓN', [
                 _buildInfoRow('Provincia', provinceName),
                 _buildInfoRow('Ciudad', vehicle.city),
+                if (vehicle.lugar != null && vehicle.lugar!.isNotEmpty)
+                  _buildInfoRow('Lugar', vehicle.lugar!),
               ]),
               pw.SizedBox(height: 16),
               
