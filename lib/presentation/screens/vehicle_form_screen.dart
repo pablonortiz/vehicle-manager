@@ -466,6 +466,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                               _selectedLugarId = null;
                             });
                           }
+                        } else {
+                          // Rebuild so LugarAutocomplete gets the updated pendingCityText
+                          setState(() {});
                         }
                       },
                       validator: (value) {
@@ -637,10 +640,14 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       // Invalidate location providers if we created new city/lugar
       if (createdNewCity) {
         ref.invalidate(citiesByProvinceProvider(_selectedProvinceId));
+        ref.invalidate(vehicleCountByCityProvider(_selectedProvinceId));
       }
       if (createdNewLugar && cityId != null) {
         ref.invalidate(lugaresByCityProvider(cityId));
+        ref.invalidate(vehicleCountByLugarProvider(cityId));
       }
+      // Always refresh province counts since a new vehicle was added
+      ref.invalidate(vehicleCountByProvinceProvider);
 
       final vehicle = Vehicle(
         id: widget.vehicleId,

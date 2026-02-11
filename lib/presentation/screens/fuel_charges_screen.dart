@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
@@ -285,7 +286,9 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
       text: widget.existing?.liters.toString() ?? '',
     );
     _priceController = TextEditingController(
-      text: widget.existing?.price.toStringAsFixed(0) ?? '',
+      text: widget.existing != null
+          ? _formatWithDots(widget.existing!.price.toStringAsFixed(0))
+          : '',
     );
     _odometerController = TextEditingController(
       text: widget.existing?.odometer?.toString() ?? '',
@@ -398,7 +401,7 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
                             _receiptPhotoUrl = result.cloudinaryUrl;
                             _receiptPhotoPublicId = result.cloudinaryPublicId;
                             if (result.extractedValue != null) {
-                              _priceController.text = result.extractedValue!.toStringAsFixed(0);
+                              _priceController.text = _formatWithDots(result.extractedValue!.toStringAsFixed(0));
                               _priceFromOcr = true;
                             }
                           });
@@ -463,12 +466,13 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
                         ? const Icon(Icons.check_circle, color: AppTheme.success, size: 20)
                         : null,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorFormatter()],
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Ingrese el precio';
                     }
-                    if (double.tryParse(value.replaceAll(',', '.').replaceAll('.', '')) == null) {
+                    if (int.tryParse(value.replaceAll('.', '')) == null) {
                       return 'Número inválido';
                     }
                     return null;
@@ -609,5 +613,39 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
         setState(() => _isSaving = false);
       }
     }
+  }
+}
+
+String _formatWithDots(String digits) {
+  digits = digits.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.isEmpty) return '';
+  final buffer = StringBuffer();
+  for (int i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) {
+      buffer.write('.');
+    }
+    buffer.write(digits[i]);
+  }
+  return buffer.toString();
+}
+
+class ThousandsSeparatorFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+    final formatted = _formatWithDots(digitsOnly);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

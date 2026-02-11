@@ -961,7 +961,11 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
               Row(
                 children: [
                   Icon(
-                    type == DocumentType.titulo ? Icons.description : Icons.credit_card,
+                    type == DocumentType.titulo
+                        ? Icons.description
+                        : type == DocumentType.vtv
+                            ? Icons.verified_user
+                            : Icons.credit_card,
                     size: 20,
                     color: AppTheme.accentPrimary,
                   ),

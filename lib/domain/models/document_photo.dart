@@ -2,7 +2,8 @@
 enum DocumentType {
   cedulaVerde(0, 'Cédula Verde'),
   cedulaAzul(1, 'Cédula Azul'),
-  titulo(2, 'Título');
+  titulo(2, 'Título'),
+  vtv(3, 'VTV');
 
   final int value;
   final String label;
