@@ -1,12 +1,12 @@
-# Gestor de Vehiculos
+# 🚗 Gestor de Vehiculos
 
 Cross-platform app for comprehensive vehicle fleet management. Built with Flutter, it runs on Android, iOS, Web, macOS, Linux, and Windows.
 
-\![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-\![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-\![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 
-## Features
+## ✨ Features
 
 ### Vehicle Management
 - **Full CRUD** with detailed vehicle information
@@ -16,49 +16,49 @@ Cross-platform app for comprehensive vehicle fleet management. Built with Flutte
 - **Location:** Province and city
 - **Status:** Available, In use, Under maintenance, Out of service
 
-### Photo Gallery
+### 📸 Photo Gallery
 - Multiple photos per vehicle
 - Main photo selection
 - Upload from camera or gallery
 - Multiple photo selection
 - Cloudinary storage
 
-### Maintenance
+### 🔧 Maintenance
 - Unlimited maintenance records per vehicle
 - Required date with calendar picker
 - Extensive detail field
 - **Attachments:** PDFs and/or invoice photos
 - Full-screen attachment viewer
 
-### Notes
+### 📝 Notes
 - Multiple notes per vehicle
 - Extensive detail field
 - Optional attached photos
 - Full-screen photo viewer
 
-### Documentation
+### 📄 Documentation
 - Sections for vehicle registration documents
 - Multiple photos per document
 - Full-screen viewer
 
-### Responsible Person
+### 👤 Responsible Person
 - Name and phone of the vehicle's responsible person
 - **Import from contacts** (mobile only)
 - One-tap direct call
 - One-tap WhatsApp message
 
-### Change History
+### 📊 Change History
 - Automatic logging of all changes
 - Chronological view
 - Details of modified field, old value, and new value
 
-### Sync
+### 🔄 Sync
 - **Offline mode:** Work without connection
 - **Local cache:** SQLite database on mobile
 - **Pull-to-refresh:** Manual sync
 - **Auto sync:** When connection is restored
 
-### PDF Export
+### 📄 PDF Export
 - Export complete vehicle data to a professional PDF
 - Includes vehicle details, photos, documentation, and maintenance records
 - Separate title page for each section
@@ -66,7 +66,7 @@ Cross-platform app for comprehensive vehicle fleet management. Built with Flutte
 - Dark design matching the app theme
 - Share or save the generated PDF
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Technology | Purpose |
 |---|---|
@@ -78,7 +78,7 @@ Cross-platform app for comprehensive vehicle fleet management. Built with Flutte
 | **Cloudinary** | Image storage |
 | **PDF/Printing** | PDF generation |
 
-## Installation
+## 📦 Installation
 
 ### Prerequisites
 
@@ -110,7 +110,7 @@ CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_UPLOAD_PRESET=your-upload-preset
 ```
 
-> **Important:** The `.env` file is in `.gitignore` and is NOT committed to the repository.
+> ⚠️ **Important:** The `.env` file is in `.gitignore` and is NOT committed to the repository.
 
 ### 4. Configure Supabase
 
@@ -130,7 +130,7 @@ Or copy the contents and run them in the Supabase SQL Editor.
 3. Create an **Upload Preset** with "Unsigned" mode
 4. Copy the preset name to `.env`
 
-## Run
+## 🚀 Run
 
 ```bash
 # Android
@@ -148,23 +148,32 @@ flutter run -d linux
 flutter run -d windows
 ```
 
-## Build
+## 📱 Build
 
+### Android APK
 ```bash
-# Android APK
 flutter build apk
-
-# Android App Bundle
-flutter build appbundle
-
-# iOS
-flutter build ios
-
-# Web
-flutter build web
+# Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-## Project Structure
+### Android App Bundle
+```bash
+flutter build appbundle
+# Output: build/app/outputs/bundle/release/app-release.aab
+```
+
+### iOS
+```bash
+flutter build ios
+```
+
+### Web
+```bash
+flutter build web
+# Output: build/web/
+```
+
+## 🗄️ Project Structure
 
 ```
 lib/
@@ -186,7 +195,16 @@ lib/
 └── main.dart
 ```
 
-## Database Schema
+## 🎨 Theme
+
+The app uses a dark theme inspired by **Radio Nacional Argentina**, featuring:
+
+- Dark background (`#121212`)
+- Blue accents (`#1E88E5`)
+- Clear, legible typography
+- Material Design icons
+
+## 📋 Database Schema
 
 | Table | Description |
 |---|---|
@@ -199,22 +217,22 @@ lib/
 | `note_photos` | Note photos |
 | `document_photos` | Documentation photos |
 
-## Security
+## 🔐 Security
 
 - Credentials stored in `.env` (not committed)
 - Row Level Security (RLS) enabled in Supabase
 - Data validation on client and server
 
-## Web vs Mobile Differences
+## 🌐 Web vs Mobile Differences
 
 | Feature | Mobile | Web |
 |---|---|---|
-| Local cache | SQLite | Supabase only |
-| Import contacts | Yes | No |
-| Camera | Yes | Browser-dependent |
-| Gallery | Yes | File picker |
-| Offline mode | Yes | No |
+| Local cache | ✅ SQLite | ❌ Supabase only |
+| Import contacts | ✅ | ❌ |
+| Camera | ✅ | ⚠️ Browser-dependent |
+| Gallery | ✅ | ✅ File picker |
+| Offline mode | ✅ | ❌ |
 
-## License
+## 📄 License
 
 MIT
