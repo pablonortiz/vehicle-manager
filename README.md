@@ -1,258 +1,220 @@
-# 🚗 Gestor de Vehículos
+# Gestor de Vehiculos
 
-Aplicación multiplataforma para la gestión integral de flotas de vehículos. Desarrollada con Flutter, funciona en Android, iOS, Web, macOS, Linux y Windows.
+Cross-platform app for comprehensive vehicle fleet management. Built with Flutter, it runs on Android, iOS, Web, macOS, Linux, and Windows.
 
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+\![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+\![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+\![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 
-## ✨ Características
+## Features
 
-### Gestión de Vehículos
-- **CRUD completo** de vehículos con información detallada
-- **Tipos soportados:** Auto, Camioneta, Camión, Moto
-- **Datos del vehículo:** Patente, marca, modelo, año, color, kilometraje
-- **VTV y Seguro:** Fechas de vencimiento con alertas visuales
-- **Ubicación:** Provincia y ciudad
-- **Estado:** Disponible, En uso, En mantenimiento, Fuera de servicio
+### Vehicle Management
+- **Full CRUD** with detailed vehicle information
+- **Supported types:** Car, Pickup, Truck, Motorcycle
+- **Vehicle data:** License plate, make, model, year, color, mileage
+- **Inspection & Insurance:** Expiration dates with visual alerts
+- **Location:** Province and city
+- **Status:** Available, In use, Under maintenance, Out of service
 
-### 📸 Galería de Fotos
-- Múltiples fotos por vehículo
-- Selección de foto principal
-- Subida desde cámara o galería
-- Selección múltiple de fotos
-- Almacenamiento en Cloudinary
+### Photo Gallery
+- Multiple photos per vehicle
+- Main photo selection
+- Upload from camera or gallery
+- Multiple photo selection
+- Cloudinary storage
 
-### 🔧 Mantenimientos
-- Registro ilimitado de mantenimientos por vehículo
-- Fecha obligatoria con selector de calendario
-- Campo de detalle extenso
-- **Adjuntos:** PDFs y/o fotos de facturas
-- Visualización de adjuntos en pantalla completa
+### Maintenance
+- Unlimited maintenance records per vehicle
+- Required date with calendar picker
+- Extensive detail field
+- **Attachments:** PDFs and/or invoice photos
+- Full-screen attachment viewer
 
-### 📝 Notas
-- Sistema de notas múltiples por vehículo
-- Campo de detalle extenso
-- Fotos adjuntas opcionales
-- Visualización de fotos en pantalla completa
+### Notes
+- Multiple notes per vehicle
+- Extensive detail field
+- Optional attached photos
+- Full-screen photo viewer
 
-### 📄 Documentación
-- Sección para Cédula Verde, Cédula Azul y Título
-- Múltiples fotos por documento
-- Visualización en pantalla completa
+### Documentation
+- Sections for vehicle registration documents
+- Multiple photos per document
+- Full-screen viewer
 
-### 👤 Responsable
-- Nombre y teléfono del responsable del vehículo
-- **Importar desde contactos** (solo móvil)
-- Llamada directa con un toque
-- Mensaje de WhatsApp con un toque
+### Responsible Person
+- Name and phone of the vehicle's responsible person
+- **Import from contacts** (mobile only)
+- One-tap direct call
+- One-tap WhatsApp message
 
-### 📊 Historial de Cambios
-- Registro automático de todos los cambios
-- Visualización cronológica
-- Detalle de campo modificado, valor anterior y nuevo
+### Change History
+- Automatic logging of all changes
+- Chronological view
+- Details of modified field, old value, and new value
 
-### 🔄 Sincronización
-- **Modo offline:** Trabaja sin conexión
-- **Cache local:** Base de datos SQLite en móvil
-- **Pull-to-refresh:** Sincronización manual
-- **Sync automático:** Al recuperar conexión
+### Sync
+- **Offline mode:** Work without connection
+- **Local cache:** SQLite database on mobile
+- **Pull-to-refresh:** Manual sync
+- **Auto sync:** When connection is restored
 
-### 📄 Exportar a PDF
-- Exportar vehículo completo a PDF profesional
-- Incluye datos del vehículo, fotos, documentación y mantenimientos
-- Cada sección con página de título separadora
-- Imágenes a página completa para mejor visualización
-- Diseño oscuro acorde al tema de la app
-- Compartir o guardar el PDF generado
+### PDF Export
+- Export complete vehicle data to a professional PDF
+- Includes vehicle details, photos, documentation, and maintenance records
+- Separate title page for each section
+- Full-page images for better viewing
+- Dark design matching the app theme
+- Share or save the generated PDF
 
-## 🛠️ Tecnologías
+## Tech Stack
 
-| Tecnología | Uso |
-|------------|-----|
-| **Flutter** | Framework UI multiplataforma |
-| **Riverpod** | Gestión de estado |
-| **GoRouter** | Navegación declarativa |
+| Technology | Purpose |
+|---|---|
+| **Flutter** | Cross-platform UI framework |
+| **Riverpod** | State management |
+| **GoRouter** | Declarative navigation |
 | **Supabase** | Backend (PostgreSQL + Auth + Storage) |
-| **SQLite** | Cache local (móvil) |
-| **Cloudinary** | Almacenamiento de imágenes |
-| **PDF/Printing** | Generación de PDFs |
+| **SQLite** | Local cache (mobile) |
+| **Cloudinary** | Image storage |
+| **PDF/Printing** | PDF generation |
 
-## 📦 Instalación
+## Installation
 
-### Prerrequisitos
+### Prerequisites
 
 - Flutter SDK 3.x
-- Cuenta en [Supabase](https://supabase.com)
-- Cuenta en [Cloudinary](https://cloudinary.com)
+- [Supabase](https://supabase.com) account
+- [Cloudinary](https://cloudinary.com) account
 
-### 1. Clonar el repositorio
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/tu-usuario/gestor-de-vehiculos.git
+git clone https://github.com/pablonortiz/gestor-de-vehiculos.git
 cd gestor-de-vehiculos
 ```
 
-### 2. Instalar dependencias
+### 2. Install dependencies
 
 ```bash
 flutter pub get
 ```
 
-### 3. Configurar variables de entorno
+### 3. Configure environment variables
 
-Crear archivo `.env` en la raíz del proyecto:
+Create a `.env` file in the project root:
 
 ```env
-SUPABASE_URL=https://tu-proyecto.supabase.co
-SUPABASE_ANON_KEY=tu-anon-key-aqui
-CLOUDINARY_CLOUD_NAME=tu-cloud-name
-CLOUDINARY_UPLOAD_PRESET=tu-upload-preset
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_UPLOAD_PRESET=your-upload-preset
 ```
 
-> ⚠️ **Importante:** El archivo `.env` está en `.gitignore` y NO se sube al repositorio.
+> **Important:** The `.env` file is in `.gitignore` and is NOT committed to the repository.
 
-### 4. Configurar Supabase
+### 4. Configure Supabase
 
-Ejecutar el script SQL en tu proyecto de Supabase:
+Run the SQL script in your Supabase project:
 
 ```bash
-# El archivo está en la raíz del proyecto
+# The file is in the project root
 supabase_schema.sql
 ```
 
-O copiar el contenido y ejecutarlo en el SQL Editor de Supabase.
+Or copy the contents and run them in the Supabase SQL Editor.
 
-### 5. Configurar Cloudinary
+### 5. Configure Cloudinary
 
-1. Crear cuenta en [Cloudinary](https://cloudinary.com)
-2. Ir a Settings > Upload
-3. Crear un **Upload Preset** con modo "Unsigned"
-4. Copiar el nombre del preset a `.env`
+1. Create an account at [Cloudinary](https://cloudinary.com)
+2. Go to Settings > Upload
+3. Create an **Upload Preset** with "Unsigned" mode
+4. Copy the preset name to `.env`
 
-## 🚀 Ejecutar
+## Run
 
-### Android
 ```bash
+# Android
 flutter run -d android
-```
 
-### iOS
-```bash
+# iOS
 flutter run -d ios
-```
 
-### Web
-```bash
+# Web
 flutter run -d chrome
-```
 
-### Desktop (macOS/Linux/Windows)
-```bash
+# Desktop
 flutter run -d macos
 flutter run -d linux
 flutter run -d windows
 ```
 
-## 📱 Compilar
+## Build
 
-### Android APK
 ```bash
+# Android APK
 flutter build apk
-# Output: build/app/outputs/flutter-apk/app-release.apk
-```
 
-### Android App Bundle
-```bash
+# Android App Bundle
 flutter build appbundle
-# Output: build/app/outputs/bundle/release/app-release.aab
-```
 
-### iOS
-```bash
+# iOS
 flutter build ios
-```
 
-### Web
-```bash
+# Web
 flutter build web
-# Output: build/web/
 ```
 
-## 🗄️ Estructura del Proyecto
+## Project Structure
 
 ```
 lib/
 ├── core/
-│   ├── config/          # Configuración (Supabase, Cloudinary)
-│   ├── constants/       # Constantes (tipos de vehículo, provincias)
-│   ├── theme/           # Tema de la aplicación
-│   └── utils/           # Utilidades
+│   ├── config/          # Configuration (Supabase, Cloudinary)
+│   ├── constants/       # Constants (vehicle types, provinces)
+│   ├── theme/           # App theme
+│   └── utils/           # Utilities
 ├── data/
 │   ├── database/        # SQLite helper
-│   ├── repositories/    # Repositorios de datos
-│   └── services/        # Servicios (sync, cloudinary)
+│   ├── repositories/    # Data repositories
+│   └── services/        # Services (sync, cloudinary)
 ├── domain/
-│   └── models/          # Modelos de dominio
+│   └── models/          # Domain models
 ├── presentation/
-│   ├── providers/       # Providers de Riverpod
-│   ├── screens/         # Pantallas
-│   └── widgets/         # Widgets reutilizables
+│   ├── providers/       # Riverpod providers
+│   ├── screens/         # Screens
+│   └── widgets/         # Reusable widgets
 └── main.dart
 ```
 
-## 🎨 Tema
+## Database Schema
 
-La aplicación usa un tema oscuro inspirado en la estética de **Radio Nacional Argentina**, con:
+| Table | Description |
+|---|---|
+| `vehicles` | Vehicle data |
+| `vehicle_history` | Change history |
+| `vehicle_photos` | Photo gallery |
+| `maintenances` | Maintenance records |
+| `maintenance_invoices` | Attached invoices |
+| `vehicle_notes` | Vehicle notes |
+| `note_photos` | Note photos |
+| `document_photos` | Documentation photos |
 
-- Fondo oscuro (`#121212`)
-- Acentos en azul (`#1E88E5`)
-- Tipografía clara y legible
-- Íconos Material Design
+## Security
 
-## 📋 Esquema de Base de Datos
+- Credentials stored in `.env` (not committed)
+- Row Level Security (RLS) enabled in Supabase
+- Data validation on client and server
 
-### Tablas principales
+## Web vs Mobile Differences
 
-| Tabla | Descripción |
-|-------|-------------|
-| `vehicles` | Datos de vehículos |
-| `vehicle_history` | Historial de cambios |
-| `vehicle_photos` | Galería de fotos |
-| `maintenances` | Registros de mantenimiento |
-| `maintenance_invoices` | Facturas adjuntas |
-| `vehicle_notes` | Notas del vehículo |
-| `note_photos` | Fotos de notas |
-| `document_photos` | Fotos de documentación |
+| Feature | Mobile | Web |
+|---|---|---|
+| Local cache | SQLite | Supabase only |
+| Import contacts | Yes | No |
+| Camera | Yes | Browser-dependent |
+| Gallery | Yes | File picker |
+| Offline mode | Yes | No |
 
-## 🔐 Seguridad
+## License
 
-- Las credenciales se almacenan en `.env` (no se commitean)
-- Row Level Security (RLS) habilitado en Supabase
-- Validación de datos en cliente y servidor
-
-## 🌐 Diferencias Web vs Móvil
-
-| Característica | Móvil | Web |
-|----------------|-------|-----|
-| Cache local | ✅ SQLite | ❌ Solo Supabase |
-| Importar contacto | ✅ | ❌ |
-| Cámara | ✅ | ⚠️ Depende del navegador |
-| Galería | ✅ | ✅ File picker |
-| Modo offline | ✅ | ❌ |
-
-## 📄 Licencia
-
-Este proyecto es privado y de uso interno.
-
-## 🤝 Contribuir
-
-1. Fork el repositorio
-2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit cambios (`git commit -m 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abrir Pull Request
-
----
-
-Desarrollado con ❤️ usando Flutter
+MIT
