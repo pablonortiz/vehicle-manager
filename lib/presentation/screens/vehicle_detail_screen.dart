@@ -20,6 +20,7 @@ import '../../data/repositories/maintenance_repository.dart';
 import '../../data/repositories/note_repository.dart';
 import '../../data/repositories/photo_repository.dart';
 import '../../data/repositories/document_photo_repository.dart';
+import '../../data/repositories/fuel_charge_repository.dart';
 import '../../data/services/cloudinary_service.dart';
 import '../../data/services/pdf_service.dart';
 import '../../data/services/sync_service.dart';
@@ -114,7 +115,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                 ),
                 actions: [
                   IconButton(
-                    onPressed: () => _exportPdf(
+                    onPressed: () => _showPdfOptions(
                       context,
                       ref,
                       vehicle,
@@ -2303,6 +2304,457 @@ Future<void> _openFileUrl(BuildContext context, String url, bool isPdf) async {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
+}
+
+// Mostrar opciones de exportación PDF
+void _showPdfOptions(
+  BuildContext context,
+  WidgetRef ref,
+  Vehicle vehicle,
+  List<VehiclePhoto> photos,
+  List<DocumentPhoto> documentPhotos,
+  List<Maintenance> maintenances,
+) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.textSecondary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Exportar PDF',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentPrimary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.directions_car, color: AppTheme.accentPrimary),
+              ),
+              title: const Text(
+                'Datos del vehículo',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              subtitle: const Text(
+                'Información general, fotos, documentos y mantenimientos',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppTheme.border),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportPdf(context, ref, vehicle, photos, documentPhotos, maintenances);
+              },
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentPrimary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.local_gas_station, color: AppTheme.accentPrimary),
+              ),
+              title: const Text(
+                'Registro de combustible',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              subtitle: const Text(
+                'Resumen de estadísticas y detalle de todas las cargas',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppTheme.border),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showFuelReportConfig(context, ref, vehicle);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// Configuración del reporte de combustible
+void _showFuelReportConfig(
+  BuildContext context,
+  WidgetRef ref,
+  Vehicle vehicle,
+) {
+  final now = DateTime.now();
+  var startDate = DateTime(now.year, 1, 1);
+  var endDate = now;
+  var ascending = true;
+  var isCustomRange = false;
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.textSecondary.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Reporte de combustible',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Period selection
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Período',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          isCustomRange = false;
+                          startDate = DateTime(now.year, 1, 1);
+                          endDate = now;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: !isCustomRange
+                              ? AppTheme.accentPrimary.withOpacity(0.2)
+                              : AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !isCustomRange ? AppTheme.accentPrimary : AppTheme.border,
+                          ),
+                        ),
+                        child: Text(
+                          'Año ${now.year}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: !isCustomRange ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final range = await showDateRangePicker(
+                          context: ctx,
+                          firstDate: DateTime(2020),
+                          lastDate: now,
+                          initialDateRange: DateTimeRange(start: startDate, end: endDate),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: AppTheme.accentPrimary,
+                                  onPrimary: AppTheme.background,
+                                  surface: AppTheme.surface,
+                                  onSurface: AppTheme.textPrimary,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (range != null) {
+                          setState(() {
+                            isCustomRange = true;
+                            startDate = range.start;
+                            endDate = range.end;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isCustomRange
+                              ? AppTheme.accentPrimary.withOpacity(0.2)
+                              : AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isCustomRange ? AppTheme.accentPrimary : AppTheme.border,
+                          ),
+                        ),
+                        child: Text(
+                          isCustomRange
+                              ? '${DateFormat('dd/MM/yy').format(startDate)} - ${DateFormat('dd/MM/yy').format(endDate)}'
+                              : 'Personalizar',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isCustomRange ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Sort order
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Orden',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => ascending = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: ascending
+                              ? AppTheme.accentPrimary.withOpacity(0.2)
+                              : AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: ascending ? AppTheme.accentPrimary : AppTheme.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_upward,
+                              size: 16,
+                              color: ascending ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Más antigua primero',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: ascending ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => ascending = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: !ascending
+                              ? AppTheme.accentPrimary.withOpacity(0.2)
+                              : AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !ascending ? AppTheme.accentPrimary : AppTheme.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_downward,
+                              size: 16,
+                              color: !ascending ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Más reciente primero',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: !ascending ? AppTheme.accentPrimary : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Generate button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _exportFuelReport(context, ref, vehicle, startDate, endDate, ascending);
+                  },
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('Generar PDF'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Exportar reporte de combustible a PDF
+Future<void> _exportFuelReport(
+  BuildContext context,
+  WidgetRef ref,
+  Vehicle vehicle,
+  DateTime startDate,
+  DateTime endDate,
+  bool ascending,
+) async {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          const Text(
+            'Generando reporte...',
+            style: TextStyle(color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Preparando reporte de combustible',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  try {
+    final repository = ref.read(fuelChargeRepositoryProvider);
+    final fuelCharges = await repository.getFuelChargesByDateRange(
+      vehicle.id!,
+      startDate,
+      DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
+    );
+
+    final pdfBytes = await PdfService.generateFuelReportPdf(
+      vehicle: vehicle,
+      fuelCharges: fuelCharges,
+      startDate: startDate,
+      endDate: endDate,
+      ascending: ascending,
+    );
+
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
+    await PdfService.sharePdf(pdfBytes, '${vehicle.plate}_combustible');
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reporte de combustible generado exitosamente'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al generar reporte: $e'),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }
