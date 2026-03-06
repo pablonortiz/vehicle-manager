@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-mobile-interaction": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-mobile-interaction"
+      ]
+    }
+  }
+}
