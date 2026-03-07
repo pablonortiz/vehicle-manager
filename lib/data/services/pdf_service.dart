@@ -1001,6 +1001,387 @@ class PdfService {
     );
   }
 
+  /// Genera el PDF combinado (vehículo + combustible)
+  static Future<Uint8List> generateCombinedPdf({
+    required Vehicle vehicle,
+    required List<VehiclePhoto> photos,
+    required List<DocumentPhoto> documentPhotos,
+    required List<Maintenance> maintenances,
+    required List<FuelCharge> fuelCharges,
+    required DateTime startDate,
+    required DateTime endDate,
+    required bool ascending,
+  }) async {
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: await PdfGoogleFonts.robotoRegular(),
+        bold: await PdfGoogleFonts.robotoBold(),
+        italic: await PdfGoogleFonts.robotoItalic(),
+      ),
+    );
+
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'es_AR',
+      symbol: '\$',
+      decimalDigits: 0,
+    );
+    final numberFormat = NumberFormat('#,###');
+
+    // ===== PARTE 1: DATOS DEL VEHÍCULO =====
+    pdf.addPage(_buildVehicleDataPage(vehicle));
+
+    // Fotos del vehículo
+    if (photos.isNotEmpty) {
+      pdf.addPage(_buildSectionTitlePage('FOTOS DEL VEHÍCULO'));
+      for (final photo in photos) {
+        final imageData = await _downloadImage(photo.cloudinaryUrl);
+        if (imageData != null) {
+          pdf.addPage(_buildFullPageImage(imageData, photo.isPrimary ? '(Principal)' : null));
+        }
+      }
+    }
+
+    // Documentación
+    final cedulaVerde = documentPhotos.where((d) => d.documentType == DocumentType.cedulaVerde).toList();
+    final cedulaAzul = documentPhotos.where((d) => d.documentType == DocumentType.cedulaAzul).toList();
+    final titulo = documentPhotos.where((d) => d.documentType == DocumentType.titulo).toList();
+
+    if (cedulaVerde.isNotEmpty) {
+      pdf.addPage(_buildSectionTitlePage('CÉDULA VERDE'));
+      for (final doc in cedulaVerde) {
+        final imageData = await _downloadImage(doc.cloudinaryUrl);
+        if (imageData != null) {
+          pdf.addPage(_buildFullPageImage(imageData, null));
+        }
+      }
+    }
+
+    if (cedulaAzul.isNotEmpty) {
+      pdf.addPage(_buildSectionTitlePage('CÉDULA AZUL'));
+      for (final doc in cedulaAzul) {
+        final imageData = await _downloadImage(doc.cloudinaryUrl);
+        if (imageData != null) {
+          pdf.addPage(_buildFullPageImage(imageData, null));
+        }
+      }
+    }
+
+    if (titulo.isNotEmpty) {
+      pdf.addPage(_buildSectionTitlePage('TÍTULO'));
+      for (final doc in titulo) {
+        final imageData = await _downloadImage(doc.cloudinaryUrl);
+        if (imageData != null) {
+          pdf.addPage(_buildFullPageImage(imageData, null));
+        }
+      }
+    }
+
+    // Mantenimientos
+    if (maintenances.isNotEmpty) {
+      pdf.addPage(_buildSectionTitlePage('MANTENIMIENTOS'));
+      for (final maintenance in maintenances) {
+        pdf.addPage(_buildMaintenanceDetailPage(maintenance));
+        for (final invoice in maintenance.invoices) {
+          if (invoice.isImage) {
+            final imageData = await _downloadImage(invoice.cloudinaryUrl);
+            if (imageData != null) {
+              pdf.addPage(_buildFullPageImage(imageData, invoice.fileName ?? 'Factura'));
+            }
+          } else if (invoice.isPdf) {
+            pdf.addPage(_buildPdfReferencePage(invoice.cloudinaryUrl, invoice.fileName));
+          }
+        }
+      }
+    }
+
+    // ===== PARTE 2: REPORTE DE COMBUSTIBLE =====
+    // Sort charges
+    final sortedCharges = List<FuelCharge>.from(fuelCharges);
+    sortedCharges.sort((a, b) => ascending
+        ? a.date.compareTo(b.date)
+        : b.date.compareTo(a.date));
+
+    // Calculate summary stats
+    final totalLiters = sortedCharges.fold<double>(0, (sum, c) => sum + c.liters);
+    final totalPrice = sortedCharges.fold<double>(0, (sum, c) => sum + c.price);
+    final avgPricePerLiter = totalLiters > 0 ? totalPrice / totalLiters : 0.0;
+    final avgLitersPerCharge = sortedCharges.isNotEmpty ? totalLiters / sortedCharges.length : 0.0;
+
+    String? avgKmBetweenCharges;
+    final chargesWithOdometer = sortedCharges.where((c) => c.odometer != null).toList();
+    chargesWithOdometer.sort((a, b) => a.date.compareTo(b.date));
+    if (chargesWithOdometer.length >= 2) {
+      final totalKm = chargesWithOdometer.last.odometer! - chargesWithOdometer.first.odometer!;
+      final avgKm = totalKm / (chargesWithOdometer.length - 1);
+      avgKmBetweenCharges = '${numberFormat.format(avgKm.round())} km';
+    }
+
+    // Fuel summary page
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) {
+          return pw.Container(
+            decoration: const pw.BoxDecoration(color: _backgroundColor),
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    color: _surfaceColor,
+                    borderRadius: pw.BorderRadius.circular(12),
+                    border: pw.Border.all(color: _primaryColor, width: 2),
+                  ),
+                  child: pw.Row(
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: _primaryColor,
+                          borderRadius: pw.BorderRadius.circular(8),
+                        ),
+                        child: pw.Text(
+                          '\u{26FD}',
+                          style: const pw.TextStyle(fontSize: 24),
+                        ),
+                      ),
+                      pw.SizedBox(width: 16),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'REPORTE DE COMBUSTIBLE',
+                              style: pw.TextStyle(
+                                fontSize: 20,
+                                fontWeight: pw.FontWeight.bold,
+                                color: _textColor,
+                              ),
+                            ),
+                            pw.Text(
+                              '${vehicle.plate} - ${vehicle.brand} ${vehicle.model}',
+                              style: const pw.TextStyle(
+                                fontSize: 14,
+                                color: _textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Period
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: pw.BoxDecoration(
+                    color: _surfaceColor,
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text(
+                    'Periodo: ${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}    |    Orden: ${ascending ? "Mas antigua a mas reciente" : "Mas reciente a mas antigua"}',
+                    style: const pw.TextStyle(
+                      fontSize: 11,
+                      color: _textSecondary,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+
+                // Summary stats
+                _buildSection('RESUMEN DEL PERIODO', [
+                  _buildInfoRow('Total de cargas', sortedCharges.length.toString()),
+                  _buildInfoRow('Litros totales', '${totalLiters.toStringAsFixed(1)} L'),
+                  _buildInfoRow('Gasto total', currencyFormat.format(totalPrice)),
+                  _buildInfoRow('Precio promedio por litro', '${currencyFormat.format(avgPricePerLiter)}/L'),
+                  _buildInfoRow('Promedio de litros por carga', '${avgLitersPerCharge.toStringAsFixed(1)} L'),
+                  if (avgKmBetweenCharges != null)
+                    _buildInfoRow('Promedio de km entre cargas', avgKmBetweenCharges),
+                ]),
+
+                pw.Spacer(),
+
+                // Footer
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    color: _surfaceColor,
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Generado: ${dateFormat.format(DateTime.now())}',
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: _textSecondary,
+                        ),
+                      ),
+                      pw.Text(
+                        'Gestor de Vehiculos',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _accentColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    // Fuel charges table pages
+    if (sortedCharges.isNotEmpty) {
+      const int chargesPerPage = 18;
+      for (int i = 0; i < sortedCharges.length; i += chargesPerPage) {
+        final pageCharges = sortedCharges.skip(i).take(chargesPerPage).toList();
+        final isFirstTablePage = i == 0;
+        final pageNum = (i ~/ chargesPerPage) + 1;
+        final totalPages = (sortedCharges.length / chargesPerPage).ceil();
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            build: (context) {
+              return pw.Container(
+                decoration: const pw.BoxDecoration(color: _backgroundColor),
+                padding: const pw.EdgeInsets.all(30),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (isFirstTablePage)
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(bottom: 16),
+                        child: pw.Text(
+                          'DETALLE DE CARGAS',
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _accentColor,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    // Table header
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: const pw.BoxDecoration(
+                        color: _accentColor,
+                        borderRadius: pw.BorderRadius.only(
+                          topLeft: pw.Radius.circular(8),
+                          topRight: pw.Radius.circular(8),
+                        ),
+                      ),
+                      child: pw.Row(
+                        children: [
+                          _tableHeader('Fecha', 70),
+                          _tableHeader('Litros', 55),
+                          _tableHeader('Total', 65),
+                          _tableHeader('\$/L', 55),
+                          _tableHeader('Odometro', 65),
+                          pw.Expanded(
+                            child: pw.Text(
+                              'Notas',
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Table rows
+                    ...pageCharges.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final charge = entry.value;
+                      final isEven = idx % 2 == 0;
+                      return pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: pw.BoxDecoration(
+                          color: isEven ? _surfaceColor : _backgroundColor,
+                          border: pw.Border(
+                            bottom: pw.BorderSide(
+                              color: PdfColor.fromInt(0xFF3A3A3A),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            _tableCell(dateFormat.format(charge.date), 70),
+                            _tableCell('${charge.liters.toStringAsFixed(1)} L', 55),
+                            _tableCell(currencyFormat.format(charge.price), 65),
+                            _tableCell('${currencyFormat.format(charge.calculatedPricePerLiter)}/L', 55),
+                            _tableCell(
+                              charge.odometer != null
+                                  ? '${numberFormat.format(charge.odometer)} km'
+                                  : '-',
+                              65,
+                            ),
+                            pw.Expanded(
+                              child: pw.Text(
+                                charge.notes ?? '-',
+                                style: const pw.TextStyle(
+                                  fontSize: 8,
+                                  color: _textSecondary,
+                                ),
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    // Bottom border
+                    pw.Container(
+                      height: 2,
+                      decoration: pw.BoxDecoration(
+                        color: _accentColor,
+                        borderRadius: const pw.BorderRadius.only(
+                          bottomLeft: pw.Radius.circular(8),
+                          bottomRight: pw.Radius.circular(8),
+                        ),
+                      ),
+                    ),
+                    pw.Spacer(),
+                    // Page number
+                    pw.Center(
+                      child: pw.Text(
+                        'Pagina $pageNum de $totalPages',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      }
+    }
+
+    return pdf.save();
+  }
+
   /// Comparte o guarda el PDF
   static Future<void> sharePdf(Uint8List pdfBytes, String vehiclePlate) async {
     await Printing.sharePdf(
