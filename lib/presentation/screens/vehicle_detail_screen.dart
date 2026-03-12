@@ -122,6 +122,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                       photosAsync.valueOrNull ?? [],
                       documentPhotosAsync.valueOrNull ?? [],
                       maintenancesAsync.valueOrNull ?? [],
+                      notesAsync.valueOrNull ?? [],
                     ),
                     icon: const Icon(Icons.picture_as_pdf),
                     tooltip: 'Exportar PDF',
@@ -2317,6 +2318,7 @@ void _showPdfOptions(
   List<VehiclePhoto> photos,
   List<DocumentPhoto> documentPhotos,
   List<Maintenance> maintenances,
+  List<VehicleNote> notes,
 ) {
   showModalBottomSheet(
     context: context,
@@ -2434,7 +2436,7 @@ void _showPdfOptions(
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                _showCombinedReportConfig(context, ref, vehicle, photos, documentPhotos, maintenances);
+                _showCombinedReportConfig(context, ref, vehicle, photos, documentPhotos, maintenances, notes);
               },
             ),
           ],
@@ -2719,6 +2721,7 @@ void _showCombinedReportConfig(
   List<VehiclePhoto> photos,
   List<DocumentPhoto> documentPhotos,
   List<Maintenance> maintenances,
+  List<VehicleNote> notes,
 ) {
   final now = DateTime.now();
   var startDate = DateTime(now.year, 1, 1);
@@ -2972,7 +2975,7 @@ void _showCombinedReportConfig(
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _exportCombinedPdf(context, ref, vehicle, photos, documentPhotos, maintenances, startDate, endDate, ascending);
+                    _exportCombinedPdf(context, ref, vehicle, photos, documentPhotos, maintenances, notes, startDate, endDate, ascending);
                   },
                   icon: const Icon(Icons.picture_as_pdf),
                   label: const Text('Generar PDF completo'),
@@ -2997,6 +3000,7 @@ Future<void> _exportCombinedPdf(
   List<VehiclePhoto> photos,
   List<DocumentPhoto> documentPhotos,
   List<Maintenance> maintenances,
+  List<VehicleNote> notes,
   DateTime startDate,
   DateTime endDate,
   bool ascending,
@@ -3041,6 +3045,7 @@ Future<void> _exportCombinedPdf(
       photos: photos,
       documentPhotos: documentPhotos,
       maintenances: maintenances,
+      notes: notes,
       fuelCharges: fuelCharges,
       startDate: startDate,
       endDate: endDate,
