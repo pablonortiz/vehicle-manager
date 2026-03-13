@@ -15,13 +15,13 @@ import '../../domain/models/fuel_charge.dart';
 import '../../domain/models/vehicle_note.dart';
 
 class PdfService {
-  // Colores del tema (estilo Radio Nacional)
-  static const _primaryColor = PdfColor.fromInt(0xFF1E88E5);
-  static const _backgroundColor = PdfColor.fromInt(0xFF1A1A1A);
-  static const _surfaceColor = PdfColor.fromInt(0xFF2D2D2D);
-  static const _textColor = PdfColor.fromInt(0xFFE0E0E0);
-  static const _textSecondary = PdfColor.fromInt(0xFF9E9E9E);
-  static const _accentColor = PdfColor.fromInt(0xFF1E88E5);
+  // Colores del tema para PDF (fondo blanco, amigable para impresión)
+  static const _primaryColor = PdfColor.fromInt(0xFF1565C0);
+  static const _backgroundColor = PdfColor.fromInt(0xFFFFFFFF);
+  static const _surfaceColor = PdfColor.fromInt(0xFFF5F5F5);
+  static const _textColor = PdfColor.fromInt(0xFF212121);
+  static const _textSecondary = PdfColor.fromInt(0xFF757575);
+  static const _accentColor = PdfColor.fromInt(0xFF1565C0);
 
   /// Genera el PDF completo del vehículo
   static Future<Uint8List> generateVehiclePdf({
@@ -1068,7 +1068,7 @@ class PdfService {
                           color: isEven ? _surfaceColor : _backgroundColor,
                           border: pw.Border(
                             bottom: pw.BorderSide(
-                              color: PdfColor.fromInt(0xFF3A3A3A),
+                              color: PdfColor.fromInt(0xFFE0E0E0),
                               width: 0.5,
                             ),
                           ),
@@ -1503,7 +1503,7 @@ class PdfService {
                           color: isEven ? _surfaceColor : _backgroundColor,
                           border: pw.Border(
                             bottom: pw.BorderSide(
-                              color: PdfColor.fromInt(0xFF3A3A3A),
+                              color: PdfColor.fromInt(0xFFE0E0E0),
                               width: 0.5,
                             ),
                           ),
