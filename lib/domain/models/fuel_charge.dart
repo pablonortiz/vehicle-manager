@@ -8,8 +8,12 @@ class FuelCharge {
   final int? odometer;
   final String? receiptPhotoUrl;
   final String? receiptPhotoPublicId;
+  final bool receiptIsPdf;
+  final String? receiptFileName;
   final String? displayPhotoUrl;
   final String? displayPhotoPublicId;
+  final bool displayIsPdf;
+  final String? displayFileName;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -24,8 +28,12 @@ class FuelCharge {
     this.odometer,
     this.receiptPhotoUrl,
     this.receiptPhotoPublicId,
+    this.receiptIsPdf = false,
+    this.receiptFileName,
     this.displayPhotoUrl,
     this.displayPhotoPublicId,
+    this.displayIsPdf = false,
+    this.displayFileName,
     this.notes,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -45,8 +53,12 @@ class FuelCharge {
     int? odometer,
     String? receiptPhotoUrl,
     String? receiptPhotoPublicId,
+    bool? receiptIsPdf,
+    String? receiptFileName,
     String? displayPhotoUrl,
     String? displayPhotoPublicId,
+    bool? displayIsPdf,
+    String? displayFileName,
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -61,8 +73,12 @@ class FuelCharge {
       odometer: odometer ?? this.odometer,
       receiptPhotoUrl: receiptPhotoUrl ?? this.receiptPhotoUrl,
       receiptPhotoPublicId: receiptPhotoPublicId ?? this.receiptPhotoPublicId,
+      receiptIsPdf: receiptIsPdf ?? this.receiptIsPdf,
+      receiptFileName: receiptFileName ?? this.receiptFileName,
       displayPhotoUrl: displayPhotoUrl ?? this.displayPhotoUrl,
       displayPhotoPublicId: displayPhotoPublicId ?? this.displayPhotoPublicId,
+      displayIsPdf: displayIsPdf ?? this.displayIsPdf,
+      displayFileName: displayFileName ?? this.displayFileName,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
@@ -80,8 +96,12 @@ class FuelCharge {
       'odometer': odometer,
       'receipt_photo_url': receiptPhotoUrl,
       'receipt_photo_public_id': receiptPhotoPublicId,
+      'receipt_is_pdf': receiptIsPdf,
+      'receipt_file_name': receiptFileName,
       'display_photo_url': displayPhotoUrl,
       'display_photo_public_id': displayPhotoPublicId,
+      'display_is_pdf': displayIsPdf,
+      'display_file_name': displayFileName,
       'notes': notes,
     };
   }
@@ -99,8 +119,12 @@ class FuelCharge {
       odometer: map['odometer'] as int?,
       receiptPhotoUrl: map['receipt_photo_url'] as String?,
       receiptPhotoPublicId: map['receipt_photo_public_id'] as String?,
+      receiptIsPdf: map['receipt_is_pdf'] as bool? ?? false,
+      receiptFileName: map['receipt_file_name'] as String?,
       displayPhotoUrl: map['display_photo_url'] as String?,
       displayPhotoPublicId: map['display_photo_public_id'] as String?,
+      displayIsPdf: map['display_is_pdf'] as bool? ?? false,
+      displayFileName: map['display_file_name'] as String?,
       notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
@@ -118,8 +142,12 @@ class FuelCharge {
       'odometer': odometer,
       'receipt_photo_url': receiptPhotoUrl,
       'receipt_photo_public_id': receiptPhotoPublicId,
+      'receipt_is_pdf': receiptIsPdf ? 1 : 0,
+      'receipt_file_name': receiptFileName,
       'display_photo_url': displayPhotoUrl,
       'display_photo_public_id': displayPhotoPublicId,
+      'display_is_pdf': displayIsPdf ? 1 : 0,
+      'display_file_name': displayFileName,
       'notes': notes,
       'created_at': createdAt.millisecondsSinceEpoch,
       'updated_at': updatedAt.millisecondsSinceEpoch,
@@ -139,8 +167,12 @@ class FuelCharge {
       odometer: map['odometer'] as int?,
       receiptPhotoUrl: map['receipt_photo_url'] as String?,
       receiptPhotoPublicId: map['receipt_photo_public_id'] as String?,
+      receiptIsPdf: (map['receipt_is_pdf'] as int?) == 1,
+      receiptFileName: map['receipt_file_name'] as String?,
       displayPhotoUrl: map['display_photo_url'] as String?,
       displayPhotoPublicId: map['display_photo_public_id'] as String?,
+      displayIsPdf: (map['display_is_pdf'] as int?) == 1,
+      displayFileName: map['display_file_name'] as String?,
       notes: map['notes'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),

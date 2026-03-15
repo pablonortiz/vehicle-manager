@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/services/ocr_service.dart';
 import '../../data/services/cloudinary_service.dart';
@@ -13,7 +15,9 @@ class OcrPhotoResult {
   final String? cloudinaryPublicId;
   final double? extractedValue;
   final bool ocrDetected;
-  final String? ocrText; // Full OCR text for debugging
+  final String? ocrText;
+  final bool isPdf;
+  final String? fileName;
 
   OcrPhotoResult({
     this.cloudinaryUrl,
@@ -21,6 +25,8 @@ class OcrPhotoResult {
     this.extractedValue,
     this.ocrDetected = false,
     this.ocrText,
+    this.isPdf = false,
+    this.fileName,
   });
 }
 
@@ -47,10 +53,12 @@ class OcrPhotoCapture extends StatefulWidget {
 class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
   String? _photoUrl;
   String? _publicId;
-  String? _localFilePath; // Keep local file for potential re-OCR
-  String? _ocrText; // Full OCR text
+  String? _localFilePath;
+  String? _ocrText;
   bool _isProcessing = false;
   bool _ocrDetected = false;
+  bool _isPdf = false;
+  String? _fileName;
 
   @override
   void initState() {
@@ -127,20 +135,45 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
   Widget _buildPhotoPreview() {
     return Stack(
       children: [
-        // Tappable image to view fullscreen
+        // Tappable image/pdf to view fullscreen
         GestureDetector(
-          onTap: _showFullScreenImage,
+          onTap: _isPdf
+              ? () => launchUrl(Uri.parse(_photoUrl!), mode: LaunchMode.externalApplication)
+              : _showFullScreenImage,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(11),
-            child: CachedNetworkImage(
-              imageUrl: _photoUrl!,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              placeholder: (_, __) => const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
+            child: _isPdf
+                ? Container(
+                    color: AppTheme.surfaceLight,
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.picture_as_pdf, color: Colors.red, size: 32),
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            _fileName ?? 'PDF',
+                            style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: _photoUrl!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
           ),
         ),
         // Expand icon overlay
@@ -249,6 +282,15 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
                 _capturePhoto(ImageSource.gallery);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Archivo (PDF/Imagen)'),
+              subtitle: const Text('Sin OCR para PDFs', style: TextStyle(fontSize: 12)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickFile();
+              },
+            ),
           ],
         ),
       ),
@@ -340,6 +382,65 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
     }
   }
 
+  Future<void> _pickFile() async {
+    setState(() => _isProcessing = true);
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+      );
+
+      if (result == null || result.files.isEmpty || result.files.first.path == null) {
+        setState(() => _isProcessing = false);
+        return;
+      }
+
+      final file = result.files.first;
+      final isPdf = file.extension?.toLowerCase() == 'pdf';
+
+      final cloudinary = CloudinaryService.instance;
+      final uploadResult = await cloudinary.uploadFile(
+        File(file.path!),
+        isPdf: isPdf,
+        fileName: file.name,
+      );
+
+      if (uploadResult != null) {
+        setState(() {
+          _photoUrl = uploadResult.url;
+          _publicId = uploadResult.publicId;
+          _isPdf = uploadResult.isPdf;
+          _fileName = uploadResult.fileName;
+          _ocrText = null;
+          _ocrDetected = false;
+          _isProcessing = false;
+        });
+
+        widget.onPhotoResult(OcrPhotoResult(
+          cloudinaryUrl: uploadResult.url,
+          cloudinaryPublicId: uploadResult.publicId,
+          isPdf: uploadResult.isPdf,
+          fileName: uploadResult.fileName,
+        ));
+      } else {
+        setState(() => _isProcessing = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al subir el archivo')),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   void _removePhoto() {
     setState(() {
       _photoUrl = null;
@@ -347,6 +448,8 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       _localFilePath = null;
       _ocrText = null;
       _ocrDetected = false;
+      _isPdf = false;
+      _fileName = null;
     });
 
     widget.onPhotoResult(OcrPhotoResult());

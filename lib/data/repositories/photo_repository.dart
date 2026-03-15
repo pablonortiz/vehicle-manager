@@ -69,6 +69,8 @@ class PhotoRepository {
       cloudinaryUrl: photo.cloudinaryUrl,
       cloudinaryPublicId: photo.cloudinaryPublicId,
       isPrimary: isPrimary,
+      isPdf: photo.isPdf,
+      fileName: photo.fileName,
     );
     
     final map = newPhoto.toMap();

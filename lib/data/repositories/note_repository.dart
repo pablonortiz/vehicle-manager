@@ -186,6 +186,8 @@ class NoteRepository {
       noteId: photo.noteId,
       cloudinaryUrl: photo.cloudinaryUrl,
       cloudinaryPublicId: photo.cloudinaryPublicId,
+      isPdf: photo.isPdf,
+      fileName: photo.fileName,
     );
     
     final map = newPhoto.toMap();

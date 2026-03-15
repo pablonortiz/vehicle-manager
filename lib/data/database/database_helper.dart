@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -86,6 +86,7 @@ class DatabaseHelper {
 
     if (oldVersion < 4) {
       // Agregar tabla de cargas de combustible
+      // Agregar tabla de cargas de combustible
       await db.execute('''
         CREATE TABLE IF NOT EXISTS fuel_charges (
           id TEXT PRIMARY KEY,
@@ -109,6 +110,20 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_fuel_charges_vehicle ON fuel_charges (vehicle_id)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_fuel_charges_date ON fuel_charges (date)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_fuel_charges_vehicle_date ON fuel_charges (vehicle_id, date)');
+    }
+
+    if (oldVersion < 5) {
+      // Soporte de archivos PDF en fotos de vehículos, documentos, notas y combustible
+      await db.execute('ALTER TABLE vehicle_photos ADD COLUMN is_pdf INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE vehicle_photos ADD COLUMN file_name TEXT');
+      await db.execute('ALTER TABLE document_photos ADD COLUMN is_pdf INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE document_photos ADD COLUMN file_name TEXT');
+      await db.execute('ALTER TABLE note_photos ADD COLUMN is_pdf INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE note_photos ADD COLUMN file_name TEXT');
+      await db.execute('ALTER TABLE fuel_charges ADD COLUMN receipt_is_pdf INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE fuel_charges ADD COLUMN receipt_file_name TEXT');
+      await db.execute('ALTER TABLE fuel_charges ADD COLUMN display_is_pdf INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE fuel_charges ADD COLUMN display_file_name TEXT');
     }
   }
 
@@ -232,6 +247,8 @@ class DatabaseHelper {
         note_id TEXT NOT NULL,
         cloudinary_url TEXT NOT NULL,
         cloudinary_public_id TEXT NOT NULL,
+        is_pdf INTEGER NOT NULL DEFAULT 0,
+        file_name TEXT,
         created_at INTEGER NOT NULL,
         synced INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (note_id) REFERENCES vehicle_notes (id) ON DELETE CASCADE
@@ -246,6 +263,8 @@ class DatabaseHelper {
         cloudinary_url TEXT NOT NULL,
         cloudinary_public_id TEXT NOT NULL,
         is_primary INTEGER NOT NULL DEFAULT 0,
+        is_pdf INTEGER NOT NULL DEFAULT 0,
+        file_name TEXT,
         created_at INTEGER NOT NULL,
         synced INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE CASCADE
@@ -260,6 +279,8 @@ class DatabaseHelper {
         document_type INTEGER NOT NULL,
         cloudinary_url TEXT NOT NULL,
         cloudinary_public_id TEXT NOT NULL,
+        is_pdf INTEGER NOT NULL DEFAULT 0,
+        file_name TEXT,
         created_at INTEGER NOT NULL,
         synced INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE CASCADE
@@ -278,8 +299,12 @@ class DatabaseHelper {
         odometer INTEGER,
         receipt_photo_url TEXT,
         receipt_photo_public_id TEXT,
+        receipt_is_pdf INTEGER NOT NULL DEFAULT 0,
+        receipt_file_name TEXT,
         display_photo_url TEXT,
         display_photo_public_id TEXT,
+        display_is_pdf INTEGER NOT NULL DEFAULT 0,
+        display_file_name TEXT,
         notes TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,

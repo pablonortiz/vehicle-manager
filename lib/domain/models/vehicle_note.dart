@@ -79,6 +79,8 @@ class NotePhoto {
   final String noteId;
   final String cloudinaryUrl;
   final String cloudinaryPublicId;
+  final bool isPdf;
+  final String? fileName;
   final DateTime createdAt;
 
   NotePhoto({
@@ -86,6 +88,8 @@ class NotePhoto {
     required this.noteId,
     required this.cloudinaryUrl,
     required this.cloudinaryPublicId,
+    this.isPdf = false,
+    this.fileName,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -95,6 +99,8 @@ class NotePhoto {
       'note_id': noteId,
       'cloudinary_url': cloudinaryUrl,
       'cloudinary_public_id': cloudinaryPublicId,
+      'is_pdf': isPdf,
+      'file_name': fileName,
     };
   }
 
@@ -104,6 +110,8 @@ class NotePhoto {
       noteId: map['note_id'] as String,
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
+      isPdf: map['is_pdf'] as bool? ?? false,
+      fileName: map['file_name'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -114,6 +122,8 @@ class NotePhoto {
       'note_id': noteId,
       'cloudinary_url': cloudinaryUrl,
       'cloudinary_public_id': cloudinaryPublicId,
+      'is_pdf': isPdf ? 1 : 0,
+      'file_name': fileName,
       'created_at': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -124,6 +134,8 @@ class NotePhoto {
       noteId: map['note_id'] as String,
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
+      isPdf: (map['is_pdf'] as int?) == 1,
+      fileName: map['file_name'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
     );
   }

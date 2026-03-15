@@ -742,14 +742,17 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          CachedNetworkImage(
-                            imageUrl: photo.cloudinaryUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(
-                              child: CircularProgressIndicator(),
+                          if (photo.isPdf)
+                            _buildPdfThumbnail(photo.fileName)
+                          else
+                            CachedNetworkImage(
+                              imageUrl: photo.cloudinaryUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (_, __, ___) => const Icon(Icons.error),
                             ),
-                            errorWidget: (_, __, ___) => const Icon(Icons.error),
-                          ),
                           if (photo.isPrimary)
                             Positioned(
                               top: 4,
@@ -796,6 +799,11 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
               title: const Text('Galería (múltiples)'),
               onTap: () => Navigator.pop(ctx, 'gallery'),
             ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Archivo (PDF/Imagen)'),
+              onTap: () => Navigator.pop(ctx, 'file'),
+            ),
           ],
         ),
       ),
@@ -822,8 +830,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
             cloudinaryPublicId: result.publicId,
           ));
         }
-      } else {
-        // Galería - selección múltiple
+      } else if (source == 'gallery') {
         final results = await cloudinary.uploadMultipleFromGallery();
         setState(() => _uploadTotal = results.length);
 
@@ -833,6 +840,21 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
             vehicleId: widget.vehicleId,
             cloudinaryUrl: result.url,
             cloudinaryPublicId: result.publicId,
+          ));
+          setState(() => _uploadProgress = i + 1);
+        }
+      } else if (source == 'file') {
+        final results = await cloudinary.uploadMultipleInvoices();
+        setState(() => _uploadTotal = results.length);
+
+        for (int i = 0; i < results.length; i++) {
+          final result = results[i];
+          await photoRepo.insertPhoto(VehiclePhoto(
+            vehicleId: widget.vehicleId,
+            cloudinaryUrl: result.url,
+            cloudinaryPublicId: result.publicId,
+            isPdf: result.isPdf,
+            fileName: result.fileName,
           ));
           setState(() => _uploadProgress = i + 1);
         }
@@ -847,15 +869,11 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
   }
 
   void _viewPhoto(VehiclePhoto photo) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        child: CachedNetworkImage(
-          imageUrl: photo.cloudinaryUrl,
-          fit: BoxFit.contain,
-        ),
-      ),
-    );
+    if (photo.isPdf) {
+      launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+    } else {
+      _showFullScreenImage(context, photo.cloudinaryUrl);
+    }
   }
 
   void _showPhotoOptions(VehiclePhoto photo) {
@@ -1020,21 +1038,29 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                 itemBuilder: (context, index) {
                   final photo = photosForType[index];
                   return GestureDetector(
-                    onTap: () => _showFullScreenImage(context, photo.cloudinaryUrl),
+                    onTap: () {
+                      if (photo.isPdf) {
+                        launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                      } else {
+                        _showFullScreenImage(context, photo.cloudinaryUrl);
+                      }
+                    },
                     onLongPress: () => _showPhotoOptions(photo),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
                       width: 70,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: photo.cloudinaryUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          errorWidget: (_, __, ___) => const Icon(Icons.error),
-                        ),
+                        child: photo.isPdf
+                            ? _buildPdfThumbnailSmall(photo.fileName)
+                            : CachedNetworkImage(
+                                imageUrl: photo.cloudinaryUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                              ),
                       ),
                     ),
                   );
@@ -1074,6 +1100,11 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
               title: const Text('Galería (múltiples)'),
               onTap: () => Navigator.pop(ctx, 'gallery'),
             ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Archivo (PDF/Imagen)'),
+              onTap: () => Navigator.pop(ctx, 'file'),
+            ),
           ],
         ),
       ),
@@ -1100,7 +1131,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
             cloudinaryPublicId: result.publicId,
           ));
         }
-      } else {
+      } else if (source == 'gallery') {
         final results = await cloudinary.uploadMultipleFromGallery();
         for (final result in results) {
           await docPhotoRepo.insertPhoto(DocumentPhoto(
@@ -1108,6 +1139,18 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
             documentType: type,
             cloudinaryUrl: result.url,
             cloudinaryPublicId: result.publicId,
+          ));
+        }
+      } else if (source == 'file') {
+        final results = await cloudinary.uploadMultipleInvoices();
+        for (final result in results) {
+          await docPhotoRepo.insertPhoto(DocumentPhoto(
+            vehicleId: widget.vehicleId,
+            documentType: type,
+            cloudinaryUrl: result.url,
+            cloudinaryPublicId: result.publicId,
+            isPdf: result.isPdf,
+            fileName: result.fileName,
           ));
         }
       }
@@ -1686,6 +1729,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
     final detailController = TextEditingController(text: note?.detail ?? '');
     List<NotePhoto> existingPhotos = List.from(note?.photos ?? []);
     List<XFile> pendingPhotos = [];
+    List<PlatformFile> pendingFiles = [];
     bool isSaving = false;
     bool isSelectingPhotos = false;
 
@@ -1753,14 +1797,48 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                             )
                           : TextButton.icon(
                               onPressed: isSaving ? null : () async {
+                                final source = await showModalBottomSheet<String>(
+                                  context: ctx,
+                                  builder: (sheetCtx) => SafeArea(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ListTile(
+                                          leading: const Icon(Icons.photo_library),
+                                          title: const Text('Galería (múltiples)'),
+                                          onTap: () => Navigator.pop(sheetCtx, 'gallery'),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.attach_file),
+                                          title: const Text('Archivo (PDF/Imagen)'),
+                                          onTap: () => Navigator.pop(sheetCtx, 'file'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                                if (source == null) return;
                                 setDialogState(() => isSelectingPhotos = true);
                                 try {
-                                  final picker = ImagePicker();
-                                  final images = await picker.pickMultiImage(imageQuality: 80);
-                                  if (images.isNotEmpty) {
-                                    setDialogState(() {
-                                      pendingPhotos.addAll(images);
-                                    });
+                                  if (source == 'gallery') {
+                                    final picker = ImagePicker();
+                                    final images = await picker.pickMultiImage(imageQuality: 80);
+                                    if (images.isNotEmpty) {
+                                      setDialogState(() {
+                                        pendingPhotos.addAll(images);
+                                      });
+                                    }
+                                  } else if (source == 'file') {
+                                    final result = await FilePicker.platform.pickFiles(
+                                      type: FileType.custom,
+                                      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+                                      allowMultiple: true,
+                                    );
+                                    if (result != null && result.files.isNotEmpty) {
+                                      setDialogState(() {
+                                        pendingFiles.addAll(result.files.where((f) => f.path != null));
+                                      });
+                                    }
                                   }
                                 } finally {
                                   setDialogState(() => isSelectingPhotos = false);
@@ -1774,7 +1852,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                   // Fotos existentes (solo en edición)
                   if (existingPhotos.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    const Text('Fotos guardadas:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    const Text('Archivos guardados:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 4),
                     SizedBox(
                       height: 80,
@@ -1786,17 +1864,25 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                           return Stack(
                             children: [
                               GestureDetector(
-                                onTap: () => _showFullScreenImage(ctx, photo.cloudinaryUrl),
+                                onTap: () {
+                                  if (photo.isPdf) {
+                                    launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                                  } else {
+                                    _showFullScreenImage(ctx, photo.cloudinaryUrl);
+                                  }
+                                },
                                 child: Container(
                                   margin: const EdgeInsets.only(right: 8),
                                   width: 80,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: CachedNetworkImage(
-                                      imageUrl: photo.cloudinaryUrl,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                    ),
+                                    child: photo.isPdf
+                                        ? _buildPdfThumbnailSmall(photo.fileName)
+                                        : CachedNetworkImage(
+                                            imageUrl: photo.cloudinaryUrl,
+                                            fit: BoxFit.cover,
+                                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                          ),
                                   ),
                                 ),
                               ),
@@ -1884,6 +1970,61 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                       ),
                     ),
                   ],
+                  // Archivos pendientes (PDFs/imágenes del file picker)
+                  if (pendingFiles.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const Text('Archivos pendientes:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 80,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: pendingFiles.length,
+                        itemBuilder: (ctx, index) {
+                          final file = pendingFiles[index];
+                          final isFilePdf = file.extension?.toLowerCase() == 'pdf';
+                          return Stack(
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                width: 80,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.warning),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: isFilePdf
+                                      ? _buildPdfThumbnailSmall(file.name)
+                                      : Image.file(File(file.path!), fit: BoxFit.cover),
+                                ),
+                              ),
+                              if (!isSaving)
+                                Positioned(
+                                  top: 2,
+                                  right: 10,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        pendingFiles.remove(file);
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: AppTheme.error,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -1924,6 +2065,29 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                                   noteId: noteId,
                                   cloudinaryUrl: result.url,
                                   cloudinaryPublicId: result.publicId,
+                                ));
+                              }
+                            }
+                          }
+
+                          // Subir archivos pendientes (PDF/imágenes del file picker)
+                          if (pendingFiles.isNotEmpty) {
+                            final cloudinary = CloudinaryService.instance;
+                            for (final file in pendingFiles) {
+                              if (file.path == null) continue;
+                              final isPdf = file.extension?.toLowerCase() == 'pdf';
+                              final result = await cloudinary.uploadFile(
+                                File(file.path!),
+                                isPdf: isPdf,
+                                fileName: file.name,
+                              );
+                              if (result != null) {
+                                await noteRepo.insertPhoto(NotePhoto(
+                                  noteId: noteId,
+                                  cloudinaryUrl: result.url,
+                                  cloudinaryPublicId: result.publicId,
+                                  isPdf: result.isPdf,
+                                  fileName: result.fileName,
                                 ));
                               }
                             }
@@ -2038,7 +2202,7 @@ class _NoteCard extends StatelessWidget {
                       ),
                       if (note.photos.isNotEmpty)
                         Text(
-                          '${note.photos.length} foto(s)',
+                          '${note.photos.length} adjunto(s)',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.accentPrimary,
@@ -2080,16 +2244,24 @@ class _NoteCard extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final photo = note.photos[index];
                     return GestureDetector(
-                      onTap: () => _showFullScreenImage(context, photo.cloudinaryUrl),
+                      onTap: () {
+                        if (photo.isPdf) {
+                          launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                        } else {
+                          _showFullScreenImage(context, photo.cloudinaryUrl);
+                        }
+                      },
                       child: Container(
                         margin: const EdgeInsets.only(right: 8),
                         width: 60,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl: photo.cloudinaryUrl,
-                            fit: BoxFit.cover,
-                          ),
+                          child: photo.isPdf
+                              ? _buildPdfThumbnailSmall(photo.fileName)
+                              : CachedNetworkImage(
+                                  imageUrl: photo.cloudinaryUrl,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                       ),
                     );
@@ -2244,6 +2416,54 @@ class _ContactButton extends StatelessWidget {
       ),
     );
   }
+}
+
+// Helper para thumbnails de PDF (tamaño grande - galería de vehículos)
+Widget _buildPdfThumbnail(String? fileName) {
+  return Container(
+    color: AppTheme.surface,
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.picture_as_pdf, color: Colors.red, size: 36),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            fileName ?? 'PDF',
+            style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper para thumbnails de PDF (tamaño pequeño - documentos, notas)
+Widget _buildPdfThumbnailSmall(String? fileName) {
+  return Container(
+    color: AppTheme.surface,
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.picture_as_pdf, color: Colors.red, size: 28),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            fileName ?? 'PDF',
+            style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // Helper para mostrar imagen en pantalla completa

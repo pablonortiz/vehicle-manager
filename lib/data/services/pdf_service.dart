@@ -45,9 +45,13 @@ class PdfService {
     if (photos.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('FOTOS DEL VEHÍCULO'));
       for (final photo in photos) {
-        final imageData = await _downloadImage(photo.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, photo.isPrimary ? '(Principal)' : null));
+        if (photo.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+        } else {
+          final imageData = await _downloadImage(photo.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, photo.isPrimary ? '(Principal)' : null));
+          }
         }
       }
     }
@@ -60,9 +64,13 @@ class PdfService {
     if (cedulaVerde.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('CÉDULA VERDE'));
       for (final doc in cedulaVerde) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -70,9 +78,13 @@ class PdfService {
     if (cedulaAzul.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('CÉDULA AZUL'));
       for (final doc in cedulaAzul) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -80,9 +92,13 @@ class PdfService {
     if (titulo.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('TÍTULO'));
       for (final doc in titulo) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -1195,9 +1211,13 @@ class PdfService {
     if (photos.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('FOTOS DEL VEHÍCULO'));
       for (final photo in photos) {
-        final imageData = await _downloadImage(photo.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, photo.isPrimary ? '(Principal)' : null));
+        if (photo.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+        } else {
+          final imageData = await _downloadImage(photo.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, photo.isPrimary ? '(Principal)' : null));
+          }
         }
       }
     }
@@ -1210,9 +1230,13 @@ class PdfService {
     if (cedulaVerde.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('CÉDULA VERDE'));
       for (final doc in cedulaVerde) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -1220,9 +1244,13 @@ class PdfService {
     if (cedulaAzul.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('CÉDULA AZUL'));
       for (final doc in cedulaAzul) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -1230,9 +1258,13 @@ class PdfService {
     if (titulo.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('TÍTULO'));
       for (final doc in titulo) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -1242,9 +1274,13 @@ class PdfService {
     if (vtvPhotos.isNotEmpty) {
       pdf.addPage(_buildSectionTitlePage('VTV'));
       for (final doc in vtvPhotos) {
-        final imageData = await _downloadImage(doc.cloudinaryUrl);
-        if (imageData != null) {
-          pdf.addPage(_buildFullPageImage(imageData, null));
+        if (doc.isPdf) {
+          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+        } else {
+          final imageData = await _downloadImage(doc.cloudinaryUrl);
+          if (imageData != null) {
+            pdf.addPage(_buildFullPageImage(imageData, null));
+          }
         }
       }
     }
@@ -1273,9 +1309,13 @@ class PdfService {
       for (final note in notes) {
         pdf.addPage(_buildNoteDetailPage(note, dateFormat));
         for (final photo in note.photos) {
-          final imageData = await _downloadImage(photo.cloudinaryUrl);
-          if (imageData != null) {
-            pdf.addPage(_buildFullPageImage(imageData, null));
+          if (photo.isPdf) {
+            pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+          } else {
+            final imageData = await _downloadImage(photo.cloudinaryUrl);
+            if (imageData != null) {
+              pdf.addPage(_buildFullPageImage(imageData, null));
+            }
           }
         }
       }

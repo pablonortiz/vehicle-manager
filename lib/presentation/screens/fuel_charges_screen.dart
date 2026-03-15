@@ -273,8 +273,12 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
 
   String? _receiptPhotoUrl;
   String? _receiptPhotoPublicId;
+  bool _receiptIsPdf = false;
+  String? _receiptFileName;
   String? _displayPhotoUrl;
   String? _displayPhotoPublicId;
+  bool _displayIsPdf = false;
+  String? _displayFileName;
 
   bool _isSaving = false;
 
@@ -298,8 +302,12 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
     );
     _receiptPhotoUrl = widget.existing?.receiptPhotoUrl;
     _receiptPhotoPublicId = widget.existing?.receiptPhotoPublicId;
+    _receiptIsPdf = widget.existing?.receiptIsPdf ?? false;
+    _receiptFileName = widget.existing?.receiptFileName;
     _displayPhotoUrl = widget.existing?.displayPhotoUrl;
     _displayPhotoPublicId = widget.existing?.displayPhotoPublicId;
+    _displayIsPdf = widget.existing?.displayIsPdf ?? false;
+    _displayFileName = widget.existing?.displayFileName;
   }
 
   @override
@@ -400,6 +408,8 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
                           setState(() {
                             _receiptPhotoUrl = result.cloudinaryUrl;
                             _receiptPhotoPublicId = result.cloudinaryPublicId;
+                            _receiptIsPdf = result.isPdf;
+                            _receiptFileName = result.fileName;
                             if (result.extractedValue != null) {
                               _priceController.text = _formatWithDots(result.extractedValue!.toStringAsFixed(0));
                               _priceFromOcr = true;
@@ -418,6 +428,8 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
                           setState(() {
                             _displayPhotoUrl = result.cloudinaryUrl;
                             _displayPhotoPublicId = result.cloudinaryPublicId;
+                            _displayIsPdf = result.isPdf;
+                            _displayFileName = result.fileName;
                             if (result.extractedValue != null) {
                               _litersController.text = result.extractedValue!.toStringAsFixed(2);
                               _litersFromOcr = true;
@@ -567,8 +579,12 @@ class _FuelChargeFormSheetState extends ConsumerState<_FuelChargeFormSheet> {
         odometer: odometer,
         receiptPhotoUrl: _receiptPhotoUrl,
         receiptPhotoPublicId: _receiptPhotoPublicId,
+        receiptIsPdf: _receiptIsPdf,
+        receiptFileName: _receiptFileName,
         displayPhotoUrl: _displayPhotoUrl,
         displayPhotoPublicId: _displayPhotoPublicId,
+        displayIsPdf: _displayIsPdf,
+        displayFileName: _displayFileName,
         notes: notes,
         createdAt: widget.existing?.createdAt,
       );

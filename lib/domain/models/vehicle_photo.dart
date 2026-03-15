@@ -4,6 +4,8 @@ class VehiclePhoto {
   final String cloudinaryUrl;
   final String cloudinaryPublicId;
   final bool isPrimary;
+  final bool isPdf;
+  final String? fileName;
   final DateTime createdAt;
 
   VehiclePhoto({
@@ -12,6 +14,8 @@ class VehiclePhoto {
     required this.cloudinaryUrl,
     required this.cloudinaryPublicId,
     this.isPrimary = false,
+    this.isPdf = false,
+    this.fileName,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -21,6 +25,8 @@ class VehiclePhoto {
     String? cloudinaryUrl,
     String? cloudinaryPublicId,
     bool? isPrimary,
+    bool? isPdf,
+    String? fileName,
     DateTime? createdAt,
   }) {
     return VehiclePhoto(
@@ -29,6 +35,8 @@ class VehiclePhoto {
       cloudinaryUrl: cloudinaryUrl ?? this.cloudinaryUrl,
       cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
       isPrimary: isPrimary ?? this.isPrimary,
+      isPdf: isPdf ?? this.isPdf,
+      fileName: fileName ?? this.fileName,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -40,6 +48,8 @@ class VehiclePhoto {
       'cloudinary_url': cloudinaryUrl,
       'cloudinary_public_id': cloudinaryPublicId,
       'is_primary': isPrimary,
+      'is_pdf': isPdf,
+      'file_name': fileName,
     };
   }
 
@@ -50,6 +60,8 @@ class VehiclePhoto {
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
       isPrimary: map['is_primary'] as bool? ?? false,
+      isPdf: map['is_pdf'] as bool? ?? false,
+      fileName: map['file_name'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -61,6 +73,8 @@ class VehiclePhoto {
       'cloudinary_url': cloudinaryUrl,
       'cloudinary_public_id': cloudinaryPublicId,
       'is_primary': isPrimary ? 1 : 0,
+      'is_pdf': isPdf ? 1 : 0,
+      'file_name': fileName,
       'created_at': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -72,6 +86,8 @@ class VehiclePhoto {
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
       isPrimary: (map['is_primary'] as int?) == 1,
+      isPdf: (map['is_pdf'] as int?) == 1,
+      fileName: map['file_name'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
     );
   }
