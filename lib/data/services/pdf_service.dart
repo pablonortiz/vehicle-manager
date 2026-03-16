@@ -46,7 +46,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('FOTOS DEL VEHÍCULO'));
       for (final photo in photos) {
         if (photo.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+          await _addPdfAttachmentPages(pdf, photo.cloudinaryUrl, photo.fileName);
         } else {
           final imageData = await _downloadImage(photo.cloudinaryUrl);
           if (imageData != null) {
@@ -65,7 +65,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('CÉDULA VERDE'));
       for (final doc in cedulaVerde) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -79,7 +79,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('CÉDULA AZUL'));
       for (final doc in cedulaAzul) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -93,7 +93,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('TÍTULO'));
       for (final doc in titulo) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -121,8 +121,7 @@ class PdfService {
               ));
             }
           } else if (invoice.isPdf) {
-            // Para PDFs, mostrar una página indicando que es un PDF externo
-            pdf.addPage(_buildPdfReferencePage(invoice.cloudinaryUrl, invoice.fileName));
+            await _addPdfAttachmentPages(pdf, invoice.cloudinaryUrl, invoice.fileName);
           }
         }
       }
@@ -826,6 +825,42 @@ class PdfService {
     return null;
   }
 
+  /// Descarga un PDF y lo rasteriza a imágenes PNG
+  static Future<List<Uint8List>> _downloadAndRasterizePdf(String url, {double dpi = 150}) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) return [];
+
+      final pages = <Uint8List>[];
+      await for (final page in Printing.raster(response.bodyBytes, dpi: dpi)) {
+        pages.add(await page.toPng());
+      }
+      return pages;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Agrega páginas de un PDF adjunto al documento generado
+  static Future<void> _addPdfAttachmentPages(
+    pw.Document pdf,
+    String cloudinaryUrl,
+    String? fileName,
+  ) async {
+    final pages = await _downloadAndRasterizePdf(cloudinaryUrl);
+    if (pages.isNotEmpty) {
+      for (int i = 0; i < pages.length; i++) {
+        final caption = pages.length > 1
+            ? '${fileName ?? 'PDF'} - Pág. ${i + 1}/${pages.length}'
+            : fileName;
+        pdf.addPage(_buildFullPageImage(pages[i], caption));
+      }
+    } else {
+      // Fallback si no se pudo rasterizar
+      pdf.addPage(_buildPdfReferencePage(cloudinaryUrl, fileName));
+    }
+  }
+
   /// Genera el PDF de reporte de combustible
   static Future<Uint8List> generateFuelReportPdf({
     required Vehicle vehicle,
@@ -1212,7 +1247,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('FOTOS DEL VEHÍCULO'));
       for (final photo in photos) {
         if (photo.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+          await _addPdfAttachmentPages(pdf, photo.cloudinaryUrl, photo.fileName);
         } else {
           final imageData = await _downloadImage(photo.cloudinaryUrl);
           if (imageData != null) {
@@ -1231,7 +1266,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('CÉDULA VERDE'));
       for (final doc in cedulaVerde) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -1245,7 +1280,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('CÉDULA AZUL'));
       for (final doc in cedulaAzul) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -1259,7 +1294,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('TÍTULO'));
       for (final doc in titulo) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -1275,7 +1310,7 @@ class PdfService {
       pdf.addPage(_buildSectionTitlePage('VTV'));
       for (final doc in vtvPhotos) {
         if (doc.isPdf) {
-          pdf.addPage(_buildPdfReferencePage(doc.cloudinaryUrl, doc.fileName));
+          await _addPdfAttachmentPages(pdf, doc.cloudinaryUrl, doc.fileName);
         } else {
           final imageData = await _downloadImage(doc.cloudinaryUrl);
           if (imageData != null) {
@@ -1297,7 +1332,7 @@ class PdfService {
               pdf.addPage(_buildFullPageImage(imageData, invoice.fileName ?? 'Factura'));
             }
           } else if (invoice.isPdf) {
-            pdf.addPage(_buildPdfReferencePage(invoice.cloudinaryUrl, invoice.fileName));
+            await _addPdfAttachmentPages(pdf, invoice.cloudinaryUrl, invoice.fileName);
           }
         }
       }
@@ -1310,7 +1345,7 @@ class PdfService {
         pdf.addPage(_buildNoteDetailPage(note, dateFormat));
         for (final photo in note.photos) {
           if (photo.isPdf) {
-            pdf.addPage(_buildPdfReferencePage(photo.cloudinaryUrl, photo.fileName));
+            await _addPdfAttachmentPages(pdf, photo.cloudinaryUrl, photo.fileName);
           } else {
             final imageData = await _downloadImage(photo.cloudinaryUrl);
             if (imageData != null) {
@@ -1619,5 +1654,10 @@ class PdfService {
   /// Muestra vista previa e imprime
   static Future<void> printPdf(Uint8List pdfBytes) async {
     await Printing.layoutPdf(onLayout: (_) => pdfBytes);
+  }
+
+  /// Descarga y rasteriza un PDF externo a imágenes PNG (para preview en la app)
+  static Future<List<Uint8List>> rasterizePdfFromUrl(String url, {double dpi = 200}) async {
+    return _downloadAndRasterizePdf(url, dpi: dpi);
   }
 }

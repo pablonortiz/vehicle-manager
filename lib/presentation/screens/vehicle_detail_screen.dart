@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -870,7 +871,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
 
   void _viewPhoto(VehiclePhoto photo) {
     if (photo.isPdf) {
-      launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+      _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
     } else {
       _showFullScreenImage(context, photo.cloudinaryUrl);
     }
@@ -1040,7 +1041,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                   return GestureDetector(
                     onTap: () {
                       if (photo.isPdf) {
-                        launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                        _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
                       } else {
                         _showFullScreenImage(context, photo.cloudinaryUrl);
                       }
@@ -1399,7 +1400,7 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
                       children: existingInvoices.map((invoice) => GestureDetector(
                         onTap: () {
                           if (invoice.isPdf) {
-                            _openFileUrl(ctx, invoice.cloudinaryUrl, true);
+                            _showPdfPreview(ctx, invoice.cloudinaryUrl, invoice.fileName);
                           } else {
                             _showFullScreenImage(ctx, invoice.cloudinaryUrl);
                           }
@@ -1866,7 +1867,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
                               GestureDetector(
                                 onTap: () {
                                   if (photo.isPdf) {
-                                    launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                                    _showPdfPreview(ctx, photo.cloudinaryUrl, photo.fileName);
                                   } else {
                                     _showFullScreenImage(ctx, photo.cloudinaryUrl);
                                   }
@@ -2246,7 +2247,7 @@ class _NoteCard extends StatelessWidget {
                     return GestureDetector(
                       onTap: () {
                         if (photo.isPdf) {
-                          launchUrl(Uri.parse(photo.cloudinaryUrl), mode: LaunchMode.externalApplication);
+                          _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
                         } else {
                           _showFullScreenImage(context, photo.cloudinaryUrl);
                         }
@@ -2508,25 +2509,130 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
   );
 }
 
-// Helper para abrir archivos (PDFs o imágenes) en el navegador
-Future<void> _openFileUrl(BuildContext context, String url, bool isPdf) async {
-  final uri = Uri.parse(url);
-  try {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el archivo')),
-        );
+// Helper para previsualizar PDFs descargándolos y rasterizándolos a imágenes
+void _showPdfPreview(BuildContext context, String url, String? fileName) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => _PdfPreviewDialog(url: url, fileName: fileName),
+  );
+}
+
+class _PdfPreviewDialog extends StatefulWidget {
+  final String url;
+  final String? fileName;
+  const _PdfPreviewDialog({required this.url, this.fileName});
+
+  @override
+  State<_PdfPreviewDialog> createState() => _PdfPreviewDialogState();
+}
+
+class _PdfPreviewDialogState extends State<_PdfPreviewDialog> {
+  List<Uint8List>? _pages;
+  bool _loading = true;
+  String? _error;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPdf();
+  }
+
+  Future<void> _loadPdf() async {
+    try {
+      final pages = await PdfService.rasterizePdfFromUrl(widget.url);
+      if (mounted) {
+        setState(() {
+          _pages = pages;
+          _loading = false;
+          if (pages.isEmpty) _error = 'No se pudo cargar el PDF';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Error al cargar: $e';
+        });
       }
     }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
-      );
-    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black87,
+      insetPadding: const EdgeInsets.all(8),
+      child: Stack(
+        children: [
+          if (_loading)
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text('Cargando PDF...', style: TextStyle(color: Colors.white)),
+                ],
+              ),
+            )
+          else if (_error != null)
+            Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.white)),
+            )
+          else if (_pages != null && _pages!.isNotEmpty)
+            Column(
+              children: [
+                const SizedBox(height: 40),
+                Expanded(
+                  child: PageView.builder(
+                    itemCount: _pages!.length,
+                    onPageChanged: (i) => setState(() => _currentPage = i),
+                    itemBuilder: (ctx, index) => InteractiveViewer(
+                      child: Center(
+                        child: Image.memory(_pages![index], fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_pages!.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'Página ${_currentPage + 1} de ${_pages!.length}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ),
+              ],
+            ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ),
+          if (widget.fileName != null)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Text(
+                widget.fileName!,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
