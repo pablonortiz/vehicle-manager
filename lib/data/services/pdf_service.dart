@@ -825,14 +825,27 @@ class PdfService {
     return null;
   }
 
+  /// Descarga un PDF desde una URL y retorna los bytes
+  static Future<Uint8List?> downloadPdfBytes(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200 && response.bodyBytes.length > 10) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      // Error de descarga
+    }
+    return null;
+  }
+
   /// Descarga un PDF y lo rasteriza a imágenes PNG
   static Future<List<Uint8List>> _downloadAndRasterizePdf(String url, {double dpi = 150}) async {
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode != 200) return [];
+      final pdfBytes = await downloadPdfBytes(url);
+      if (pdfBytes == null) return [];
 
       final pages = <Uint8List>[];
-      await for (final page in Printing.raster(response.bodyBytes, dpi: dpi)) {
+      await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
         pages.add(await page.toPng());
       }
       return pages;

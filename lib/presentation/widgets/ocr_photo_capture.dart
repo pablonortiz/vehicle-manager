@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import 'package:printing/printing.dart';
 import '../../data/services/ocr_service.dart';
 import '../../data/services/cloudinary_service.dart';
 import '../../data/services/pdf_service.dart';
@@ -250,10 +250,11 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
   void _showPdfPreviewDialog() {
     if (_photoUrl == null) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _PdfPreviewDialogOcr(url: _photoUrl!, fileName: _fileName),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _PdfPreviewPageOcr(url: _photoUrl!, fileName: _fileName),
+      ),
     );
   }
 
@@ -619,110 +620,29 @@ class _FullScreenImageViewer extends StatelessWidget {
   }
 }
 
-class _PdfPreviewDialogOcr extends StatefulWidget {
+class _PdfPreviewPageOcr extends StatelessWidget {
   final String url;
   final String? fileName;
-  const _PdfPreviewDialogOcr({required this.url, this.fileName});
-
-  @override
-  State<_PdfPreviewDialogOcr> createState() => _PdfPreviewDialogOcrState();
-}
-
-class _PdfPreviewDialogOcrState extends State<_PdfPreviewDialogOcr> {
-  List<Uint8List>? _pages;
-  bool _loading = true;
-  String? _error;
-  int _currentPage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPdf();
-  }
-
-  Future<void> _loadPdf() async {
-    try {
-      final pages = await PdfService.rasterizePdfFromUrl(widget.url);
-      if (mounted) {
-        setState(() {
-          _pages = pages;
-          _loading = false;
-          if (pages.isEmpty) _error = 'No se pudo cargar el PDF';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'Error al cargar: $e';
-        });
-      }
-    }
-  }
+  const _PdfPreviewPageOcr({required this.url, this.fileName});
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.black87,
-      insetPadding: const EdgeInsets.all(8),
-      child: Stack(
-        children: [
-          if (_loading)
-            const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 16),
-                  Text('Cargando PDF...', style: TextStyle(color: Colors.white)),
-                ],
-              ),
-            )
-          else if (_error != null)
-            Center(
-              child: Text(_error!, style: const TextStyle(color: Colors.white)),
-            )
-          else if (_pages != null && _pages!.isNotEmpty)
-            Column(
-              children: [
-                const SizedBox(height: 40),
-                Expanded(
-                  child: PageView.builder(
-                    itemCount: _pages!.length,
-                    onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (ctx, index) => InteractiveViewer(
-                      child: Center(
-                        child: Image.memory(_pages![index], fit: BoxFit.contain),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_pages!.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      'Página ${_currentPage + 1} de ${_pages!.length}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                  ),
-              ],
-            ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.close, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: Text(fileName ?? 'PDF'),
+        backgroundColor: AppTheme.surface,
+      ),
+      body: PdfPreview(
+        build: (format) async {
+          final bytes = await PdfService.downloadPdfBytes(url);
+          if (bytes == null) throw Exception('No se pudo descargar el PDF');
+          return bytes;
+        },
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        canDebug: false,
+        pdfFileName: fileName,
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +22,7 @@ import '../../data/repositories/photo_repository.dart';
 import '../../data/repositories/document_photo_repository.dart';
 import '../../data/repositories/fuel_charge_repository.dart';
 import '../../data/services/cloudinary_service.dart';
+import 'package:printing/printing.dart';
 import '../../data/services/pdf_service.dart';
 import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
@@ -2509,128 +2509,39 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
   );
 }
 
-// Helper para previsualizar PDFs descargándolos y rasterizándolos a imágenes
+// Helper para previsualizar PDFs usando PdfPreview del paquete printing
 void _showPdfPreview(BuildContext context, String url, String? fileName) {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => _PdfPreviewDialog(url: url, fileName: fileName),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _PdfPreviewPage(url: url, fileName: fileName),
+    ),
   );
 }
 
-class _PdfPreviewDialog extends StatefulWidget {
+class _PdfPreviewPage extends StatelessWidget {
   final String url;
   final String? fileName;
-  const _PdfPreviewDialog({required this.url, this.fileName});
-
-  @override
-  State<_PdfPreviewDialog> createState() => _PdfPreviewDialogState();
-}
-
-class _PdfPreviewDialogState extends State<_PdfPreviewDialog> {
-  List<Uint8List>? _pages;
-  bool _loading = true;
-  String? _error;
-  int _currentPage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPdf();
-  }
-
-  Future<void> _loadPdf() async {
-    try {
-      final pages = await PdfService.rasterizePdfFromUrl(widget.url);
-      if (mounted) {
-        setState(() {
-          _pages = pages;
-          _loading = false;
-          if (pages.isEmpty) _error = 'No se pudo cargar el PDF';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'Error al cargar: $e';
-        });
-      }
-    }
-  }
+  const _PdfPreviewPage({required this.url, this.fileName});
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.black87,
-      insetPadding: const EdgeInsets.all(8),
-      child: Stack(
-        children: [
-          if (_loading)
-            const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 16),
-                  Text('Cargando PDF...', style: TextStyle(color: Colors.white)),
-                ],
-              ),
-            )
-          else if (_error != null)
-            Center(
-              child: Text(_error!, style: const TextStyle(color: Colors.white)),
-            )
-          else if (_pages != null && _pages!.isNotEmpty)
-            Column(
-              children: [
-                const SizedBox(height: 40),
-                Expanded(
-                  child: PageView.builder(
-                    itemCount: _pages!.length,
-                    onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (ctx, index) => InteractiveViewer(
-                      child: Center(
-                        child: Image.memory(_pages![index], fit: BoxFit.contain),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_pages!.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      'Página ${_currentPage + 1} de ${_pages!.length}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                  ),
-              ],
-            ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.close, color: Colors.white),
-              ),
-            ),
-          ),
-          if (widget.fileName != null)
-            Positioned(
-              top: 12,
-              left: 12,
-              child: Text(
-                widget.fileName!,
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ),
-        ],
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: Text(fileName ?? 'PDF'),
+        backgroundColor: AppTheme.surface,
+      ),
+      body: PdfPreview(
+        build: (format) async {
+          final bytes = await PdfService.downloadPdfBytes(url);
+          if (bytes == null) throw Exception('No se pudo descargar el PDF');
+          return bytes;
+        },
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        canDebug: false,
+        pdfFileName: fileName,
       ),
     );
   }
