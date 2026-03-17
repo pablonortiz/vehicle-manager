@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' show Color;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -828,12 +829,15 @@ class PdfService {
   /// Descarga un PDF desde una URL y retorna los bytes
   static Future<Uint8List?> downloadPdfBytes(String url) async {
     try {
+      debugPrint('📄 [PDF] Descargando: $url');
       final response = await http.get(Uri.parse(url));
+      debugPrint('📄 [PDF] Status: ${response.statusCode}, Size: ${response.bodyBytes.length}');
       if (response.statusCode == 200 && response.bodyBytes.length > 10) {
         return response.bodyBytes;
       }
+      debugPrint('📄 [PDF] Respuesta no válida');
     } catch (e) {
-      // Error de descarga
+      debugPrint('📄 [PDF] Error descarga: $e');
     }
     return null;
   }

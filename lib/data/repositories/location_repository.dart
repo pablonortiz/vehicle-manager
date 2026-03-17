@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/utils/text_normalizer.dart';
@@ -148,6 +149,7 @@ class LocationRepository {
     if (kIsWeb) {
       if (!SupabaseConfig.isConfigured) throw Exception('Supabase no configurado');
       await SupabaseConfig.client.from('cities').insert(newCity.toSupabase());
+      DbChangeService.instance.notifyChange('cities');
       return newCity;
     }
 
@@ -180,6 +182,7 @@ class LocationRepository {
       );
     }
 
+    DbChangeService.instance.notifyChange('cities');
     return newCity;
   }
 
@@ -335,6 +338,7 @@ class LocationRepository {
     if (kIsWeb) {
       if (!SupabaseConfig.isConfigured) throw Exception('Supabase no configurado');
       await SupabaseConfig.client.from('lugares').insert(newLugar.toSupabase());
+      DbChangeService.instance.notifyChange('lugares');
       return newLugar;
     }
 
@@ -367,6 +371,7 @@ class LocationRepository {
       );
     }
 
+    DbChangeService.instance.notifyChange('lugares');
     return newLugar;
   }
 

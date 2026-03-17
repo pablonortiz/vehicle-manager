@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/vehicle_constants.dart';
@@ -209,7 +210,7 @@ class VehicleRepository {
     // En web, insertar directamente en Supabase
     if (kIsWeb) {
       if (!SupabaseConfig.isConfigured) throw Exception('Supabase no configurado');
-      
+
       await SupabaseConfig.client.from('vehicles').insert(newVehicle.toSupabase());
       await SupabaseConfig.client.from('vehicle_history').insert({
         'id': historyId,
@@ -218,6 +219,7 @@ class VehicleRepository {
         'old_value': '',
         'new_value': 'Vehículo creado',
       });
+      DbChangeService.instance.notifyChange('vehicles');
       return id;
     }
     
@@ -277,7 +279,8 @@ class VehicleRepository {
         data: newVehicle.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicles');
     return id;
   }
 
@@ -330,7 +333,8 @@ class VehicleRepository {
         data: updatedVehicle.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicles');
     return result;
   }
 
@@ -365,7 +369,8 @@ class VehicleRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicles');
     return result;
   }
 

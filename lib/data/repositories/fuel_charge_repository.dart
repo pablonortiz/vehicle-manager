@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/fuel_charge.dart';
@@ -207,6 +208,7 @@ class FuelChargeRepository {
       );
     }
 
+    DbChangeService.instance.notifyChange('fuel_charges');
     return id;
   }
 
@@ -252,6 +254,7 @@ class FuelChargeRepository {
       );
     }
 
+    DbChangeService.instance.notifyChange('fuel_charges');
     return result;
   }
 
@@ -282,6 +285,7 @@ class FuelChargeRepository {
       );
     }
 
+    DbChangeService.instance.notifyChange('fuel_charges');
     return result;
   }
 

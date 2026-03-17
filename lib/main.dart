@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/router.dart';
+import 'data/services/db_change_service.dart';
 import 'data/services/sync_service.dart';
 
 void main() async {
@@ -65,10 +66,14 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
   @override
   void initState() {
     super.initState();
-    // Sincronizar datos al iniciar la app
+    // Sincronizar datos y suscribirse a cambios en tiempo real
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (SupabaseConfig.isConfigured) {
         ref.read(syncServiceProvider.notifier).fullSync();
+        DbChangeService.instance.onRemoteChange = () {
+          ref.read(syncServiceProvider.notifier).fullSync();
+        };
+        DbChangeService.instance.startRealtimeSubscription();
       }
     });
   }

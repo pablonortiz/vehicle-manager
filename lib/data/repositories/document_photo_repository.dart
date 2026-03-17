@@ -3,9 +3,11 @@ import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/document_photo.dart';
+import '../../presentation/providers/db_change_provider.dart';
 
 final documentPhotoRepositoryProvider = Provider<DocumentPhotoRepository>((ref) {
   final repo = DocumentPhotoRepository();
@@ -13,11 +15,13 @@ final documentPhotoRepositoryProvider = Provider<DocumentPhotoRepository>((ref) 
 });
 
 final documentPhotosByVehicleProvider = FutureProvider.family<List<DocumentPhoto>, String>((ref, vehicleId) async {
+  ref.watch(photosChangeProvider);
   final repo = ref.watch(documentPhotoRepositoryProvider);
   return repo.getPhotosByVehicle(vehicleId);
 });
 
 final documentPhotosByTypeProvider = FutureProvider.family<List<DocumentPhoto>, ({String vehicleId, DocumentType type})>((ref, params) async {
+  ref.watch(photosChangeProvider);
   final repo = ref.watch(documentPhotoRepositoryProvider);
   return repo.getPhotosByType(params.vehicleId, params.type);
 });
@@ -101,7 +105,8 @@ class DocumentPhotoRepository {
         data: newPhoto.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('document_photos');
     return id;
   }
 
@@ -131,7 +136,8 @@ class DocumentPhotoRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('document_photos');
     return result;
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/maintenance.dart';
@@ -85,7 +86,8 @@ class MaintenanceRepository {
         data: newMaintenance.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('maintenances');
     return id;
   }
 
@@ -129,7 +131,8 @@ class MaintenanceRepository {
         data: updatedMaintenance.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('maintenances');
     return result;
   }
 
@@ -162,7 +165,9 @@ class MaintenanceRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('maintenances');
+    DbChangeService.instance.notifyChange('maintenance_invoices');
     return result;
   }
 
@@ -216,7 +221,8 @@ class MaintenanceRepository {
         data: newInvoice.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('maintenance_invoices');
     return id;
   }
 
@@ -244,7 +250,8 @@ class MaintenanceRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('maintenance_invoices');
     return result;
   }
 }

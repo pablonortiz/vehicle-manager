@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
+import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/vehicle_note.dart';
@@ -85,7 +86,8 @@ class NoteRepository {
         data: newNote.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicle_notes');
     return id;
   }
 
@@ -129,7 +131,8 @@ class NoteRepository {
         data: updatedNote.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicle_notes');
     return result;
   }
 
@@ -162,7 +165,9 @@ class NoteRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('vehicle_notes');
+    DbChangeService.instance.notifyChange('note_photos');
     return result;
   }
 
@@ -216,7 +221,8 @@ class NoteRepository {
         data: newPhoto.toSupabase(),
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('note_photos');
     return id;
   }
 
@@ -244,7 +250,8 @@ class NoteRepository {
         data: {},
       );
     }
-    
+
+    DbChangeService.instance.notifyChange('note_photos');
     return result;
   }
 }

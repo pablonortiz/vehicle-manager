@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/vehicle_repository.dart';
 import '../../data/repositories/maintenance_repository.dart';
 import '../../data/repositories/note_repository.dart';
 import '../../data/repositories/photo_repository.dart';
+import '../../data/services/db_change_service.dart';
 import '../../data/services/sync_service.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/vehicle_note.dart';
 import '../../domain/models/vehicle_photo.dart';
+import 'db_change_provider.dart';
 import 'location_provider.dart';
 
 // Repository providers
@@ -42,36 +45,42 @@ final photoRepositoryProvider = Provider((ref) {
 
 // Lista de todos los vehículos
 final vehiclesProvider = FutureProvider<List<Vehicle>>((ref) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getAllVehicles();
 });
 
 // Vehículos por provincia
 final vehiclesByProvinceProvider = FutureProvider.family<List<Vehicle>, int>((ref, provinceId) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehiclesByProvince(provinceId);
 });
 
 // Conteo de vehículos por provincia
 final vehicleCountByProvinceProvider = FutureProvider<Map<int, int>>((ref) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehicleCountByProvince();
 });
 
 // Total de vehículos
 final totalVehicleCountProvider = FutureProvider<int>((ref) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getTotalVehicleCount();
 });
 
 // Vehículo por ID
 final vehicleByIdProvider = FutureProvider.family<Vehicle?, String>((ref, id) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehicleById(id);
 });
 
 // Búsqueda de vehículos
 final vehicleSearchProvider = FutureProvider.family<List<Vehicle>, String>((ref, query) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   if (query.isEmpty) return [];
   return repository.searchVehicles(query);
@@ -79,30 +88,35 @@ final vehicleSearchProvider = FutureProvider.family<List<Vehicle>, String>((ref,
 
 // Historial de un vehículo
 final vehicleHistoryProvider = FutureProvider.family<List<VehicleHistory>, String>((ref, vehicleId) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehicleHistory(vehicleId);
 });
 
 // Vehículos con documentos por vencer
 final expiringDocumentsProvider = FutureProvider<List<Vehicle>>((ref) async {
+  ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehiclesWithExpiringDocuments();
 });
 
 // Mantenimientos de un vehículo
 final maintenancesByVehicleProvider = FutureProvider.family<List<Maintenance>, String>((ref, vehicleId) async {
+  ref.watch(maintenancesChangeProvider);
   final repository = ref.watch(maintenanceRepositoryProvider);
   return repository.getMaintenancesByVehicle(vehicleId);
 });
 
 // Notas de un vehículo
 final notesByVehicleProvider = FutureProvider.family<List<VehicleNote>, String>((ref, vehicleId) async {
+  ref.watch(notesChangeProvider);
   final repository = ref.watch(noteRepositoryProvider);
   return repository.getNotesByVehicle(vehicleId);
 });
 
 // Fotos de un vehículo
 final photosByVehicleProvider = FutureProvider.family<List<VehiclePhoto>, String>((ref, vehicleId) async {
+  ref.watch(photosChangeProvider);
   final repository = ref.watch(photoRepositoryProvider);
   return repository.getPhotosByVehicle(vehicleId);
 });
@@ -111,9 +125,20 @@ final photosByVehicleProvider = FutureProvider.family<List<VehiclePhoto>, String
 class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
   final VehicleRepository _repository;
   final Ref _ref;
+  StreamSubscription<String>? _subscription;
 
   VehicleNotifier(this._repository, this._ref) : super(const AsyncValue.loading()) {
     loadVehicles();
+    // Listen for external DB changes (e.g., from sync)
+    _subscription = DbChangeService.instance.changes
+        .where((table) => table == 'vehicles')
+        .listen((_) => loadVehicles());
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<void> loadVehicles() async {

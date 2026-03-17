@@ -3,6 +3,7 @@ import '../../data/repositories/location_repository.dart';
 import '../../data/services/sync_service.dart';
 import '../../domain/models/city.dart';
 import '../../domain/models/lugar.dart';
+import 'db_change_provider.dart';
 
 // Repository provider
 final locationRepositoryProvider = Provider((ref) {
@@ -18,24 +19,28 @@ final locationRepositoryProvider = Provider((ref) {
 
 /// Cities by province
 final citiesByProvinceProvider = FutureProvider.family<List<City>, int>((ref, provinceId) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getCitiesByProvince(provinceId);
 });
 
 /// Search cities in a province
 final citySearchProvider = FutureProvider.family<List<City>, ({int provinceId, String query})>((ref, params) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.searchCities(params.provinceId, params.query);
 });
 
 /// City by ID
 final cityByIdProvider = FutureProvider.family<City?, String>((ref, id) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getCityById(id);
 });
 
 /// Vehicle count by city in a province
 final vehicleCountByCityProvider = FutureProvider.family<Map<String, int>, int>((ref, provinceId) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getVehicleCountByCity(provinceId);
 });
@@ -46,24 +51,28 @@ final vehicleCountByCityProvider = FutureProvider.family<Map<String, int>, int>(
 
 /// Lugares by city
 final lugaresByCityProvider = FutureProvider.family<List<Lugar>, String>((ref, cityId) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getLugaresByCity(cityId);
 });
 
 /// Search lugares in a city
 final lugarSearchProvider = FutureProvider.family<List<Lugar>, ({String cityId, String query})>((ref, params) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.searchLugares(params.cityId, params.query);
 });
 
 /// Lugar by ID
 final lugarByIdProvider = FutureProvider.family<Lugar?, String>((ref, id) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getLugarById(id);
 });
 
 /// Vehicle count by lugar in a city
 final vehicleCountByLugarProvider = FutureProvider.family<Map<String, int>, String>((ref, cityId) async {
+  ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getVehicleCountByLugar(cityId);
 });

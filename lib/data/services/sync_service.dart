@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/supabase_config.dart';
 import '../database/database.dart';
+import 'db_change_service.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';
@@ -198,6 +199,19 @@ class SyncService extends StateNotifier<SyncState> {
       }
 
       debugPrint('✅ [SYNC] Sincronización completa exitosa');
+
+      // Notify all tables that data may have changed
+      DbChangeService.instance.notifyChange('vehicles');
+      DbChangeService.instance.notifyChange('vehicle_photos');
+      DbChangeService.instance.notifyChange('document_photos');
+      DbChangeService.instance.notifyChange('maintenances');
+      DbChangeService.instance.notifyChange('maintenance_invoices');
+      DbChangeService.instance.notifyChange('vehicle_notes');
+      DbChangeService.instance.notifyChange('note_photos');
+      DbChangeService.instance.notifyChange('fuel_charges');
+      DbChangeService.instance.notifyChange('cities');
+      DbChangeService.instance.notifyChange('lugares');
+
       state = state.copyWith(
         status: SyncStatus.success,
         message: 'Sincronización completa',
