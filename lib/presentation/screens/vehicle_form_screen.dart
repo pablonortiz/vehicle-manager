@@ -227,7 +227,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                       inputFormatters: [
                         UpperCaseTextFormatter(),
                         FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
-                        LengthLimitingTextInputFormatter(7),
+                        LengthLimitingTextInputFormatter(10),
                       ],
                       validator: (value) {
                         if (value == null || value.isEmpty) {
