@@ -10,6 +10,7 @@ import '../providers/location_provider.dart';
 import '../providers/vehicle_provider.dart';
 import 'location_filter_label.dart';
 import 'pdf_export_flow.dart';
+import 'sheet_notice.dart';
 import 'status_filter_chip.dart';
 
 /// Abre el sheet de exportación del listado y, si el usuario confirma, genera
@@ -164,7 +165,13 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
               ),
             ],
             const SizedBox(height: 20),
-            _ExportPreview(count: selectedCount),
+            SheetNotice(
+              icon: selectedCount == 0
+                  ? Icons.info_outline
+                  : Icons.description_outlined,
+              message: _previewMessage(selectedCount),
+              isWarning: selectedCount == 0,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -180,6 +187,14 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
         ),
       ),
     );
+  }
+
+  /// "Se van a exportar 12 vehículos" o aviso de que el filtro quedó vacío.
+  static String _previewMessage(int count) {
+    if (count == 0) return 'No hay vehículos para exportar con este filtro';
+    return count == 1
+        ? 'Se va a exportar 1 vehículo'
+        : 'Se van a exportar $count vehículos';
   }
 
   TextStyle _optionStyle(bool isSelected) => TextStyle(
@@ -273,56 +288,6 @@ class _ScopeOption extends StatelessWidget {
           ),
         ),
         child: child,
-      ),
-    );
-  }
-}
-
-/// "Se van a exportar 12 vehículos" o aviso de que el filtro quedó vacío.
-class _ExportPreview extends StatelessWidget {
-  final int count;
-
-  const _ExportPreview({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    final isEmpty = count == 0;
-    final message = isEmpty
-        ? 'No hay vehículos para exportar con este filtro'
-        : count == 1
-            ? 'Se va a exportar 1 vehículo'
-            : 'Se van a exportar $count vehículos';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isEmpty
-              ? AppTheme.warning.withValues(alpha: 0.5)
-              : AppTheme.border,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isEmpty ? Icons.info_outline : Icons.description_outlined,
-            color: isEmpty ? AppTheme.warning : AppTheme.accentPrimary,
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

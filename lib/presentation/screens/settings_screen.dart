@@ -5,6 +5,7 @@ import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
+import '../widgets/fleet_insurance_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +22,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final totalCountAsync = ref.watch(totalVehicleCountProvider);
     final syncState = ref.watch(syncServiceProvider);
     final queueCounts = ref.watch(syncQueueCountsProvider).valueOrNull;
+    final hasVehicles = (totalCountAsync.valueOrNull ?? 0) > 0;
 
     return SafeArea(
       child: ListView(
@@ -167,6 +169,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 24),
           ],
+
+          // Sección Flota
+          const Text(
+            'Flota',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.accentPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.security,
+            title: 'Seguro de la flota',
+            subtitle: hasVehicles
+                ? 'Asignar compañía y vencimiento a varios vehículos'
+                : 'Sin vehículos cargados',
+            trailing:
+                const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+            onTap: hasVehicles
+                ? () => showFleetInsuranceSheet(context, ref)
+                : null,
+          ),
+          const SizedBox(height: 32),
 
           // Sección Sincronización
           const Text(

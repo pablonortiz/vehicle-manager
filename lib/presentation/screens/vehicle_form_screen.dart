@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/date_picker_field.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/location_provider.dart';
@@ -680,7 +680,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       // Documentación
       _SectionLabel(label: 'Documentación'),
       const SizedBox(height: 12),
-      _DatePickerField(
+      DatePickerField(
         label: 'Vencimiento VTV',
         value: _vtvExpiry,
         onChanged: (date) {
@@ -699,7 +699,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         ),
       ),
       const SizedBox(height: 12),
-      _DatePickerField(
+      DatePickerField(
         label: 'Vencimiento Seguro',
         value: _insuranceExpiry,
         onChanged: (date) {
@@ -853,66 +853,6 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppTheme.textSecondary,
-      ),
-    );
-  }
-}
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? value;
-  final ValueChanged<DateTime?> onChanged;
-
-  const _DatePickerField({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
-    
-    return GestureDetector(
-      onTap: () async {
-        final date = await showDatePicker(
-          context: context,
-          initialDate: value ?? DateTime.now(),
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
-          builder: (context, child) {
-            return Theme(
-              data: Theme.of(context).copyWith(
-                colorScheme: const ColorScheme.dark(
-                  primary: AppTheme.accentPrimary,
-                  surface: AppTheme.surface,
-                ),
-              ),
-              child: child!,
-            );
-          },
-        );
-        onChanged(date);
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.calendar_today),
-          suffixIcon: value != null
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () => onChanged(null),
-                )
-              : null,
-        ),
-        child: Text(
-          value != null ? dateFormat.format(value!) : 'Seleccionar fecha',
-          style: TextStyle(
-            color: value != null 
-                ? AppTheme.textPrimary 
-                : AppTheme.textSecondary,
-          ),
-        ),
       ),
     );
   }

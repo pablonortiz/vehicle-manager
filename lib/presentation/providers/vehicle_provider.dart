@@ -174,6 +174,19 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
     }
   }
 
+  /// Guarda varios vehículos uno por uno, cada uno con su historial y su sync
+  /// como una edición normal. Devuelve cuántos fallaron; [onProgress] recibe
+  /// cuántos van procesados.
+  Future<int> updateVehicles(List<Vehicle> vehicles,
+      {void Function(int done)? onProgress}) async {
+    var failed = 0;
+    for (var i = 0; i < vehicles.length; i++) {
+      if (!await updateVehicle(vehicles[i])) failed++;
+      onProgress?.call(i + 1);
+    }
+    return failed;
+  }
+
   Future<bool> deleteVehicle(String id) async {
     try {
       await _repository.deleteVehicle(id);

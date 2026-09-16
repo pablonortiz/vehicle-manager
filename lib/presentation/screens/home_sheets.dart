@@ -8,6 +8,7 @@ import '../../domain/models/city.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/location_provider.dart';
+import '../widgets/fleet_insurance_sheet.dart';
 
 /// Bottom-sheet con las ciudades de una provincia y su conteo de vehículos.
 void showCitiesInProvinceSheet(
@@ -185,7 +186,7 @@ void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
     ),
     // Sobre el navigator raíz para tapar el FAB del shell.
     useRootNavigator: true,
-    builder: (context) => SafeArea(
+    builder: (sheetContext) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -211,7 +212,9 @@ void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: vehicles.length,
-              itemBuilder: (context, index) {
+              // El push usa el context de la pantalla, no el del ítem del
+              // sheet que se acaba de cerrar.
+              itemBuilder: (_, index) {
                 final vehicle = vehicles[index];
                 final hasExpired =
                     vehicle.isVtvExpired || vehicle.isInsuranceExpired;
@@ -238,13 +241,30 @@ void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
                   isThreeLine: vehicle.expiringDocuments.length > 1,
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
                     context.push('/vehicle/${vehicle.id}?highlight=docs');
                   },
                 );
               },
             ),
           ),
+          // Con seguros venciendo, la renovación suele ser de toda la flota.
+          if (vehicles.any((vehicle) =>
+              vehicle.isInsuranceExpired || vehicle.isInsuranceExpiringSoon))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    showFleetInsuranceSheet(context, ref);
+                  },
+                  icon: const Icon(Icons.security, size: 18),
+                  label: const Text('Renovar seguro de la flota'),
+                ),
+              ),
+            ),
           const SizedBox(height: 20),
         ],
       ),
