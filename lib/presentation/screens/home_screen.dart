@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/provinces.dart';
+import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
@@ -19,6 +20,7 @@ class HomeScreen extends ConsumerWidget {
     final vehicleCountAsync = ref.watch(vehicleCountByProvinceProvider);
     final totalCountAsync = ref.watch(totalVehicleCountProvider);
     final expiringAsync = ref.watch(expiringDocumentsProvider);
+    final statusCountsAsync = ref.watch(vehicleStatusCountsProvider);
     final syncState = ref.watch(syncServiceProvider);
     final hasNoVehicles = totalCountAsync.valueOrNull == 0;
 
@@ -148,6 +150,7 @@ class HomeScreen extends ConsumerWidget {
                               ),
                               icon: Icons.directions_car,
                               color: AppTheme.accentPrimary,
+                              onTap: () => _openVehicles(context, ref),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -168,6 +171,20 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _statusStatCard(context, ref,
+                                statusCountsAsync, VehicleStatus.available),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _statusStatCard(context, ref,
+                                statusCountsAsync, VehicleStatus.outOfService),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 28),
 
                       // Título sección provincias
@@ -180,7 +197,7 @@ class HomeScreen extends ConsumerWidget {
                                 Theme.of(context).textTheme.headlineMedium,
                           ),
                           TextButton(
-                            onPressed: () => context.go('/vehicles'),
+                            onPressed: () => _openVehicles(context, ref),
                             child: const Text('Ver todos'),
                           ),
                         ],
@@ -244,6 +261,7 @@ class HomeScreen extends ConsumerWidget {
                           province: province,
                           vehicleCount: countMap[province.id] ?? 0,
                           onTap: () {
+                            ref.read(statusFilterProvider.notifier).state = null;
                             ref.read(locationFilterProvider.notifier).setProvince(province.id);
                             context.go('/vehicles');
                           },
@@ -283,6 +301,33 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
+  /// Abre el listado completo (sin filtro de ubicación), opcionalmente
+  /// acotado a un [status].
+  void _openVehicles(BuildContext context, WidgetRef ref,
+      {VehicleStatus? status}) {
+    ref.read(locationFilterProvider.notifier).clearAll();
+    ref.read(statusFilterProvider.notifier).state = status;
+    context.go('/vehicles');
+  }
+
+  Widget _statusStatCard(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<Map<VehicleStatus, int>> countsAsync,
+    VehicleStatus status,
+  ) {
+    return _StatCard(
+      title: status.pluralLabel,
+      value: countsAsync.when(
+        data: (counts) => '${counts[status] ?? 0}',
+        loading: () => '...',
+        error: (_, _) => '0',
+      ),
+      icon: status.icon,
+      color: status.color,
+      onTap: () => _openVehicles(context, ref, status: status),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {

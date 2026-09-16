@@ -120,6 +120,7 @@ Widget _buildCityList(
         ),
         onTap: () {
           Navigator.pop(context);
+          ref.read(statusFilterProvider.notifier).state = null;
           ref.read(locationFilterProvider.notifier).setProvince(province.id);
           ref.read(locationFilterProvider.notifier).setCity(city.id);
           GoRouter.of(context).go('/vehicles');

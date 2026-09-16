@@ -21,6 +21,20 @@ extension VehicleTypeExtension on VehicleType {
     }
   }
 
+  /// Plural para conteos y títulos: "Autos", "Camionetas".
+  String get pluralLabel {
+    switch (this) {
+      case VehicleType.car:
+        return 'Autos';
+      case VehicleType.pickup:
+        return 'Camionetas';
+      case VehicleType.truck:
+        return 'Camiones';
+      case VehicleType.motorcycle:
+        return 'Motos';
+    }
+  }
+
   String get iconAsset {
     switch (this) {
       case VehicleType.car:
@@ -47,6 +61,20 @@ extension VehicleStatusExtension on VehicleStatus {
     switch (this) {
       case VehicleStatus.available:
         return 'Disponible';
+      case VehicleStatus.inUse:
+        return 'En uso';
+      case VehicleStatus.inWorkshop:
+        return 'En taller';
+      case VehicleStatus.outOfService:
+        return 'Fuera de servicio';
+    }
+  }
+
+  /// Plural para conteos y títulos: "Disponibles", "Fuera de servicio".
+  String get pluralLabel {
+    switch (this) {
+      case VehicleStatus.available:
+        return 'Disponibles';
       case VehicleStatus.inUse:
         return 'En uso';
       case VehicleStatus.inWorkshop:

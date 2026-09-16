@@ -485,79 +485,6 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
   }
 }
 
-// Diálogo de progreso reutilizable para los export de PDF.
-void _showPdfProgressDialog(
-    BuildContext context, String title, String subtitle) {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          Text(title, style: const TextStyle(color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// Orquesta el flujo común de exportar un PDF: progreso → generar → cerrar
-// diálogo → compartir → feedback. El cierre del diálogo ocurre una sola vez
-// (flag dialogOpen) para que un fallo de sharePdf no saque la pantalla de la pila.
-Future<void> _runPdfExport(
-  BuildContext context, {
-  required String progressTitle,
-  required String progressSubtitle,
-  required Future<Uint8List> Function() generate,
-  required String fileName,
-  required String successMessage,
-  required String errorPrefix,
-}) async {
-  _showPdfProgressDialog(context, progressTitle, progressSubtitle);
-
-  var dialogOpen = true;
-  try {
-    final pdfBytes = await generate();
-
-    if (context.mounted) {
-      Navigator.pop(context);
-      dialogOpen = false;
-    }
-
-    await PdfService.sharePdf(pdfBytes, fileName);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(successMessage),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  } catch (e) {
-    if (dialogOpen && context.mounted) {
-      Navigator.pop(context);
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$errorPrefix: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
-  }
-}
-
 // Exportar reporte combinado a PDF
 Future<void> _exportCombinedPdf(
   BuildContext context,
@@ -571,11 +498,11 @@ Future<void> _exportCombinedPdf(
   DateTime endDate,
   bool ascending,
 ) {
-  return _runPdfExport(
+  return runPdfExport(
     context,
     progressTitle: 'Generando reporte completo...',
     progressSubtitle: 'Preparando datos del vehículo y combustible',
-    fileName: '${vehicle.plate}_completo',
+    fileName: 'vehiculo_${vehicle.plate}_completo',
     successMessage: 'Reporte completo generado exitosamente',
     errorPrefix: 'Error al generar reporte',
     generate: () async {
@@ -609,11 +536,11 @@ Future<void> _exportFuelReport(
   DateTime endDate,
   bool ascending,
 ) {
-  return _runPdfExport(
+  return runPdfExport(
     context,
     progressTitle: 'Generando reporte...',
     progressSubtitle: 'Preparando reporte de combustible',
-    fileName: '${vehicle.plate}_combustible',
+    fileName: 'vehiculo_${vehicle.plate}_combustible',
     successMessage: 'Reporte de combustible generado exitosamente',
     errorPrefix: 'Error al generar reporte',
     generate: () async {
@@ -643,11 +570,11 @@ Future<void> _exportPdf(
   List<DocumentPhoto> documentPhotos,
   List<Maintenance> maintenances,
 ) {
-  return _runPdfExport(
+  return runPdfExport(
     context,
     progressTitle: 'Generando PDF...',
     progressSubtitle: 'Descargando imágenes y creando documento',
-    fileName: vehicle.plate,
+    fileName: 'vehiculo_${vehicle.plate}',
     successMessage: 'PDF generado exitosamente',
     errorPrefix: 'Error al generar PDF',
     generate: () => PdfService.generateVehiclePdf(

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +32,7 @@ import '../../core/utils/thousands_formatter.dart';
 import '../widgets/error_retry_view.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/app_card.dart';
+import '../widgets/pdf_export_flow.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';

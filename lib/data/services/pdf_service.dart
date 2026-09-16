@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/constants/vehicle_constants.dart';
@@ -16,15 +15,16 @@ import '../../domain/models/fuel_charge.dart';
 import '../../domain/models/vehicle_note.dart';
 import 'fuel_stats.dart';
 import 'pdf_image_downloader.dart';
+import 'pdf_theme.dart';
 
 class PdfService {
-  // Colores del tema para PDF (fondo blanco, amigable para impresión)
-  static const _primaryColor = PdfColor.fromInt(0xFF1565C0);
-  static const _backgroundColor = PdfColor.fromInt(0xFFFFFFFF);
-  static const _surfaceColor = PdfColor.fromInt(0xFFF5F5F5);
-  static const _textColor = PdfColor.fromInt(0xFF212121);
-  static const _textSecondary = PdfColor.fromInt(0xFF757575);
-  static const _accentColor = PdfColor.fromInt(0xFF1565C0);
+  // Paleta compartida (ver PdfTheme): fondo blanco, amigable para impresión.
+  static const _primaryColor = PdfTheme.primary;
+  static const _backgroundColor = PdfTheme.background;
+  static const _surfaceColor = PdfTheme.surface;
+  static const _textColor = PdfTheme.textPrimary;
+  static const _textSecondary = PdfTheme.textSecondary;
+  static const _accentColor = PdfTheme.primary;
 
   /// Genera el PDF completo del vehículo
   static Future<Uint8List> generateVehiclePdf({
@@ -892,31 +892,10 @@ class PdfService {
     );
   }
 
-  /// Obtiene el color según el estado del vehículo
-  static PdfColor _getStatusColor(VehicleStatus status) {
-    switch (status) {
-      case VehicleStatus.available:
-        return PdfColor.fromInt(0xFF4CAF50);
-      case VehicleStatus.inUse:
-        return PdfColor.fromInt(0xFF2196F3);
-      case VehicleStatus.inWorkshop:
-        return PdfColor.fromInt(0xFFFF9800);
-      case VehicleStatus.outOfService:
-        return PdfColor.fromInt(0xFFF44336);
-    }
-  }
+  static PdfColor _getStatusColor(VehicleStatus status) =>
+      PdfTheme.statusColor(status);
 
-  /// Descarga una imagen desde URL
-  // Documento PDF con la fuente Roboto (base/bold/italic) ya configurada.
-  static Future<pw.Document> _createDocument() async {
-    return pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
-  }
+  static Future<pw.Document> _createDocument() => PdfTheme.createDocument();
 
   /// Descarga un PDF desde una URL y retorna los bytes. Wrapper para los callers
   /// externos (preview); la implementación vive en PdfImageDownloader.
@@ -1429,19 +1408,6 @@ class PdfService {
     _addFuelTablePages(pdf, stats);
 
     return pdf.save();
-  }
-
-  /// Comparte o guarda el PDF
-  static Future<void> sharePdf(Uint8List pdfBytes, String vehiclePlate) async {
-    await Printing.sharePdf(
-      bytes: pdfBytes,
-      filename: 'vehiculo_$vehiclePlate.pdf',
-    );
-  }
-
-  /// Muestra vista previa e imprime
-  static Future<void> printPdf(Uint8List pdfBytes) async {
-    await Printing.layoutPdf(onLayout: (_) => pdfBytes);
   }
 
   /// Descarga y rasteriza un PDF externo a imágenes PNG (para preview en la app)

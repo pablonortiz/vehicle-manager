@@ -19,6 +19,8 @@ class AppFormats {
 
   static String money(num value) => _money.format(value);
 
+  static String integer(num value) => _integer.format(value);
+
   static String km(num value) => '${_integer.format(value)} km';
 
   static String liters(num value) => '${_liters.format(value)} L';

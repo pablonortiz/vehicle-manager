@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/vehicle_constants.dart';
 import '../../data/repositories/vehicle_repository.dart';
 import '../../data/repositories/maintenance_repository.dart';
 import '../../data/repositories/note_repository.dart';
@@ -7,6 +8,7 @@ import '../../data/repositories/photo_repository.dart';
 import '../../data/services/db_change_service.dart';
 import '../../data/services/sync_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../domain/fleet_summary.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';
@@ -220,4 +222,15 @@ final vehiclesByLocationFilterProvider = Provider<AsyncValue<List<Vehicle>>>((re
 
     return filtered;
   });
+});
+
+/// Filtro de estado del listado (null = todos). Vive fuera de la pantalla para
+/// que la Home pueda abrir el listado ya filtrado y el filtro persista entre
+/// pestañas, igual que el de ubicación.
+final statusFilterProvider = StateProvider<VehicleStatus?>((ref) => null);
+
+/// Conteo de vehículos por estado (solo estados con vehículos), para la Home.
+final vehicleStatusCountsProvider =
+    Provider<AsyncValue<Map<VehicleStatus, int>>>((ref) {
+  return ref.watch(vehiclesProvider).whenData(FleetSummary.countByStatus);
 });
