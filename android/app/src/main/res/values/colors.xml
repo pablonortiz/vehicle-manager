@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del tema oscuro (token bg), el de arranque por defecto: sin el
+         flash blanco antes del primer frame. -->
+    <color name="splash_background">#0A1628</color>
+</resources>
