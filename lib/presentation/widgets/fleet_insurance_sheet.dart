@@ -13,8 +13,11 @@ import 'sheet_notice.dart';
 /// uno por uno mostrando el progreso. Los destildados conservan su seguro.
 Future<void> showFleetInsuranceSheet(
     BuildContext context, WidgetRef ref) async {
-  final vehicles = ref.read(vehicleNotifierProvider).valueOrNull;
-  if (vehicles == null || vehicles.isEmpty) {
+  // Se espera la carga: leer el valor sin esperarlo daba null en el primer
+  // uso y el sheet recién abría al segundo intento.
+  final vehicles = await ref.read(vehiclesProvider.future);
+  if (!context.mounted) return;
+  if (vehicles.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('No hay vehículos cargados')),
     );
