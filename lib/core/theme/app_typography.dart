@@ -98,6 +98,9 @@ abstract final class AppText {
     height: 20 / 15,
     fontWeight: FontWeight.w500,
     letterSpacing: 1.2,
+    // El espacio monoespaciado es tan ancho como una letra: se achica para
+    // que "AE 472 KP" se lea como una sola pieza.
+    wordSpacing: -5,
   );
 
   /// Patente en la cabecera del detalle.
@@ -107,6 +110,7 @@ abstract final class AppText {
     height: 28 / 22,
     fontWeight: FontWeight.w500,
     letterSpacing: 1.8,
+    wordSpacing: -8,
   );
 }
 
