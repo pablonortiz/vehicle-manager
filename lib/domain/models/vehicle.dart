@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../expiry_status.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/utils/civil_date.dart';
 import '../../core/utils/enum_parser.dart';
@@ -280,37 +281,21 @@ class Vehicle {
   /// Documentos vencidos o por vencer (ventana 30 días), más urgente primero.
   List<ExpiringDocument> get expiringDocuments {
     final docs = <ExpiringDocument>[
-      if (isVtvExpired || isVtvExpiringSoon) ExpiringDocument('VTV', vtvExpiry!),
-      if (isInsuranceExpired || isInsuranceExpiringSoon)
+      if (vtvStatus.needsAttention) ExpiringDocument('VTV', vtvExpiry!),
+      if (insuranceStatus.needsAttention)
         ExpiringDocument('Seguro', insuranceExpiry!),
     ];
     docs.sort((a, b) => a.expiry.compareTo(b.expiry));
     return docs;
   }
 
-  // Verificar si el VTV está por vencer (30 días)
-  bool get isVtvExpiringSoon {
-    if (vtvExpiry == null) return false;
-    final daysUntilExpiry = vtvExpiry!.difference(DateTime.now()).inDays;
-    return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-  }
+  ExpiryStatus get vtvStatus => ExpiryStatus.of(vtvExpiry);
+  ExpiryStatus get insuranceStatus => ExpiryStatus.of(insuranceExpiry);
 
-  bool get isVtvExpired {
-    if (vtvExpiry == null) return false;
-    return vtvExpiry!.isBefore(DateTime.now());
-  }
-
-  // Verificar si el seguro está por vencer (30 días)
-  bool get isInsuranceExpiringSoon {
-    if (insuranceExpiry == null) return false;
-    final daysUntilExpiry = insuranceExpiry!.difference(DateTime.now()).inDays;
-    return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-  }
-
-  bool get isInsuranceExpired {
-    if (insuranceExpiry == null) return false;
-    return insuranceExpiry!.isBefore(DateTime.now());
-  }
+  bool get isVtvExpiringSoon => vtvStatus.isExpiringSoon;
+  bool get isVtvExpired => vtvStatus.isExpired;
+  bool get isInsuranceExpiringSoon => insuranceStatus.isExpiringSoon;
+  bool get isInsuranceExpired => insuranceStatus.isExpired;
 
   String get displayName => '$brand $model';
 
@@ -376,8 +361,10 @@ class ExpiringDocument {
 
   const ExpiringDocument(this.label, this.expiry);
 
-  bool get expired => expiry.isBefore(DateTime.now());
+  ExpiryStatus get status => ExpiryStatus.of(expiry);
+
+  bool get expired => status.isExpired;
 
   /// Días hasta el vencimiento (negativo si ya venció).
-  int get daysLeft => expiry.difference(DateTime.now()).inDays;
+  int get daysLeft => status.days;
 }
