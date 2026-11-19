@@ -29,6 +29,13 @@ class TextNormalizer {
         .trim();
   }
 
+  /// Normaliza un solo carácter (minúscula y sin acento), sin cambiar el
+  /// largo: sirve para ubicar una coincidencia en el texto original.
+  static String normalizeChar(String char) {
+    final lower = char.toLowerCase();
+    return _accentMap[lower] ?? lower;
+  }
+
   /// Checks if the normalized text contains the normalized query.
   ///
   /// Example:

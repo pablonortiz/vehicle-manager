@@ -6,6 +6,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_tone.dart';
 import '../../core/theme/app_typography.dart';
 import '../../domain/models/vehicle.dart';
+import 'highlight_text.dart';
 import 'plate_text.dart';
 import 'status_styles.dart';
 import 'vehicle_icon.dart';
@@ -21,6 +22,9 @@ class VehicleListTile extends StatelessWidget {
   final bool showExpiryAlert;
   final EdgeInsetsGeometry contentPadding;
 
+  /// Término buscado: se resalta en el nombre, la ubicación y el responsable.
+  final String? highlight;
+
   const VehicleListTile({
     super.key,
     required this.vehicle,
@@ -28,6 +32,7 @@ class VehicleListTile extends StatelessWidget {
     this.onTap,
     this.showExpiryAlert = true,
     this.contentPadding = cardPadding,
+    this.highlight,
   });
 
   /// Dentro de una `AppCard.list`.
@@ -66,8 +71,9 @@ class VehicleListTile extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
+                          child: HighlightText(
                             vehicle.displayName,
+                            query: highlight,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppText.titleSm.copyWith(color: c.text),
@@ -86,9 +92,18 @@ class VehicleListTile extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         PlateText(vehicle.plate),
-                        if (location.isNotEmpty) Text(location, style: meta),
+                        if (location.isNotEmpty)
+                          HighlightText(
+                            location,
+                            query: highlight,
+                            style: meta,
+                          ),
                         if (vehicle.responsibleName.trim().isNotEmpty)
-                          Text(vehicle.responsibleName, style: meta),
+                          HighlightText(
+                            vehicle.responsibleName,
+                            query: highlight,
+                            style: meta,
+                          ),
                       ],
                     ),
                     if (showExpiryAlert) _ExpiryAlert(vehicle: vehicle),
