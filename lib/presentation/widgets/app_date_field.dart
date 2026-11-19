@@ -60,6 +60,9 @@ class AppDateField extends StatelessWidget {
   static final _format = DateFormat('dd/MM/yyyy');
 
   Future<void> _pick(BuildContext context) async {
+    // Sin esto, al cerrar el picker el foco vuelve al último campo de texto y
+    // se reabre el teclado.
+    FocusManager.instance.primaryFocus?.unfocus();
     final picked = await showAppDatePicker(
       context,
       initialDate: value,

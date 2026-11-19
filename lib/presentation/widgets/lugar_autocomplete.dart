@@ -119,8 +119,9 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
     if (widget.cityId == null && !hasPendingCity) {
       return LocationAutocomplete<Lugar>(
         controller: widget.controller,
-        labelText: 'Lugar (opcional)',
-        prefixIcon: Icons.place,
+        label: 'Lugar',
+        prefixIcon: Icons.place_rounded,
+        hintText: 'Primero elegí la ciudad',
         suggestions: const [],
         displayStringForOption: (lugar) => lugar.name,
         enabled: false,
@@ -133,8 +134,8 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
     if (widget.cityId == null && hasPendingCity) {
       return LocationAutocomplete<Lugar>(
         controller: widget.controller,
-        labelText: 'Lugar (opcional)',
-        prefixIcon: Icons.place,
+        label: 'Lugar',
+        prefixIcon: Icons.place_rounded,
         suggestions: const [],
         displayStringForOption: (lugar) => lugar.name,
         enabled: isEnabled,
@@ -150,8 +151,9 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
     return lugaresAsync.when(
       loading: () => LocationAutocomplete<Lugar>(
         controller: widget.controller,
-        labelText: 'Lugar (opcional)',
-        prefixIcon: Icons.place,
+        label: 'Lugar',
+        prefixIcon: Icons.place_rounded,
+        hintText: 'Opcional',
         suggestions: const [],
         displayStringForOption: (lugar) => lugar.name,
         enabled: isEnabled,
@@ -160,8 +162,9 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
       ),
       error: (error, stack) => LocationAutocomplete<Lugar>(
         controller: widget.controller,
-        labelText: 'Lugar (opcional)',
-        prefixIcon: Icons.place,
+        label: 'Lugar',
+        prefixIcon: Icons.place_rounded,
+        hintText: 'Opcional',
         suggestions: const [],
         displayStringForOption: (lugar) => lugar.name,
         enabled: isEnabled,
@@ -169,8 +172,9 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
       ),
       data: (lugares) => LocationAutocomplete<Lugar>(
         controller: widget.controller,
-        labelText: 'Lugar (opcional)',
-        prefixIcon: Icons.place,
+        label: 'Lugar',
+        prefixIcon: Icons.place_rounded,
+        hintText: 'Opcional',
         suggestions: lugares,
         displayStringForOption: (lugar) => lugar.name,
         onSelected: _onLugarSelected,

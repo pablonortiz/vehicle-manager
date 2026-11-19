@@ -174,6 +174,13 @@ abstract final class PaintColors {
   static const naranja = Color(0xFFEA580C);
   static const marron = Color(0xFF78350F);
   static const beige = Color(0xFFD4C5A9);
+
+  static const _darkInk = Color(0xFF111111);
+  static const _lightInk = Color(0xFFFFFFFF);
+
+  /// Tinta legible encima de una pintura (el check del color elegido).
+  static Color inkOn(Color paint) =>
+      paint.computeLuminance() > 0.4 ? _darkInk : _lightInk;
 }
 
 extension AppColorsContext on BuildContext {

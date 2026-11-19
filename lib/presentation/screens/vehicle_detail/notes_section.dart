@@ -152,7 +152,7 @@ class _NoteFormSheet extends ConsumerStatefulWidget {
 }
 
 class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<AppFormState>();
   late final TextEditingController _detailController;
   late List<NotePhoto> _existingPhotos;
   final List<XFile> _pendingPhotos = [];
@@ -194,7 +194,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
           child: Text(_isSaving ? 'Guardando…' : 'Guardar nota'),
         ),
       ),
-      child: Form(
+      child: AppForm(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -325,7 +325,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validateAndReveal() ?? false)) return;
 
     setState(() => _isSaving = true);
     try {

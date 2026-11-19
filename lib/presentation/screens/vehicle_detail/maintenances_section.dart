@@ -199,7 +199,7 @@ class _MaintenanceFormSheet extends ConsumerStatefulWidget {
 }
 
 class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<AppFormState>();
   late final TextEditingController _detailController;
   late final TextEditingController _costController;
   late final String _initialCost;
@@ -254,7 +254,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           child: Text(_isSaving ? 'Guardando…' : 'Guardar mantenimiento'),
         ),
       ),
-      child: Form(
+      child: AppForm(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -376,7 +376,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   }
 
   Future<void> _save() async {
-    final formValid = _formKey.currentState?.validate() ?? false;
+    final formValid = _formKey.currentState?.validateAndReveal() ?? false;
     if (_selectedDate == null) {
       setState(() => _dateError = 'Elegí la fecha del mantenimiento');
     }

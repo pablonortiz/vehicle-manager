@@ -95,8 +95,10 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
     return citiesAsync.when(
       loading: () => LocationAutocomplete<City>(
         controller: widget.controller,
-        labelText: 'Ciudad *',
-        prefixIcon: Icons.location_city,
+        label: 'Ciudad',
+        required: true,
+        prefixIcon: Icons.location_city_rounded,
+        hintText: 'Escribí para buscar',
         suggestions: const [],
         displayStringForOption: (city) => city.name,
         enabled: widget.enabled,
@@ -105,8 +107,10 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
       ),
       error: (error, stack) => LocationAutocomplete<City>(
         controller: widget.controller,
-        labelText: 'Ciudad *',
-        prefixIcon: Icons.location_city,
+        label: 'Ciudad',
+        required: true,
+        prefixIcon: Icons.location_city_rounded,
+        hintText: 'Escribí para buscar',
         suggestions: const [],
         displayStringForOption: (city) => city.name,
         enabled: widget.enabled,
@@ -114,8 +118,10 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
       ),
       data: (cities) => LocationAutocomplete<City>(
         controller: widget.controller,
-        labelText: 'Ciudad *',
-        prefixIcon: Icons.location_city,
+        label: 'Ciudad',
+        required: true,
+        prefixIcon: Icons.location_city_rounded,
+        hintText: 'Escribí para buscar',
         suggestions: cities,
         displayStringForOption: (city) => city.name,
         onSelected: _onCitySelected,
