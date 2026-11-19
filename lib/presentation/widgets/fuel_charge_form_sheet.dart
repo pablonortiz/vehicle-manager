@@ -1,448 +1,387 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/utils/confirm_dialog.dart';
+
+import '../../core/theme/app_button_styles.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../providers/vehicle_provider.dart';
+import 'app_date_field.dart';
+import 'app_form.dart';
+import 'app_sheet.dart';
+import 'app_snack.dart';
+import 'app_text_field.dart';
 import 'ocr_photo_capture.dart';
+
+enum FuelChargeSheetResult { saved, deleteRequested }
+
+/// Abre el sheet de alta o edición de una carga. Devuelve si se guardó o si
+/// se pidió eliminarla (el borrado, con "Deshacer", lo hace la pantalla).
+Future<FuelChargeSheetResult?> showFuelChargeSheet(
+  BuildContext context, {
+  required String vehicleId,
+  FuelCharge? existing,
+}) {
+  return showAppSheet<FuelChargeSheetResult>(
+    context,
+    enableDrag: false,
+    builder: (_) => FuelChargeFormSheet(vehicleId: vehicleId, existing: existing),
+  );
+}
+
+/// Foto adjunta a una carga (ticket o surtidor).
+typedef _Photo = ({String url, String? publicId, bool isPdf, String? fileName});
 
 class FuelChargeFormSheet extends ConsumerStatefulWidget {
   final String vehicleId;
   final FuelCharge? existing;
-  final VoidCallback onSaved;
 
-  const FuelChargeFormSheet({
-    super.key,
-    required this.vehicleId,
-    this.existing,
-    required this.onSaved,
-  });
+  const FuelChargeFormSheet({super.key, required this.vehicleId, this.existing});
 
   @override
   ConsumerState<FuelChargeFormSheet> createState() => _FuelChargeFormSheetState();
 }
 
 class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late DateTime _selectedDate;
-  late TextEditingController _litersController;
-  late TextEditingController _priceController;
-  late TextEditingController _odometerController;
-  late TextEditingController _notesController;
+  final _formKey = GlobalKey<AppFormState>();
+  late DateTime _date;
+  late final DateTime _savedDate;
+  late final TextEditingController _litersController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _odometerController;
+  late final TextEditingController _notesController;
+  late final List<String> _savedTexts;
+  _Photo? _receipt;
+  _Photo? _display;
 
-  bool _litersFromOcr = false;
-  bool _priceFromOcr = false;
-
-  String? _receiptPhotoUrl;
-  String? _receiptPhotoPublicId;
-  bool _receiptIsPdf = false;
-  String? _receiptFileName;
-  String? _displayPhotoUrl;
-  String? _displayPhotoPublicId;
-  bool _displayIsPdf = false;
-  String? _displayFileName;
-
+  /// "Leído del ticket" / "Leído del surtidor" mientras el valor siga siendo
+  /// el que completó el OCR.
+  String? _litersReadFrom;
+  String? _priceReadFrom;
   bool _isSaving = false;
-  bool _hasChanges = false;
+
+  bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.existing?.date ?? DateTime.now();
+    final existing = widget.existing;
+    _date = existing?.date ?? DateTime.now();
+    _savedDate = _date;
     _litersController = TextEditingController(
-      text: widget.existing != null ? formatLitersAr(widget.existing!.liters) : '',
-    );
+        text: existing == null ? '' : formatLitersAr(existing.liters));
     _priceController = TextEditingController(
-      text: widget.existing != null
-          ? formatWithDots(widget.existing!.price.toStringAsFixed(0))
-          : '',
-    );
+        text: existing == null
+            ? ''
+            : formatWithDots(existing.price.toStringAsFixed(0)));
     _odometerController = TextEditingController(
-      text: widget.existing?.odometer?.toString() ?? '',
-    );
-    _notesController = TextEditingController(
-      text: widget.existing?.notes ?? '',
-    );
-    _receiptPhotoUrl = widget.existing?.receiptPhotoUrl;
-    _receiptPhotoPublicId = widget.existing?.receiptPhotoPublicId;
-    _receiptIsPdf = widget.existing?.receiptIsPdf ?? false;
-    _receiptFileName = widget.existing?.receiptFileName;
-    _displayPhotoUrl = widget.existing?.displayPhotoUrl;
-    _displayPhotoPublicId = widget.existing?.displayPhotoPublicId;
-    _displayIsPdf = widget.existing?.displayIsPdf ?? false;
-    _displayFileName = widget.existing?.displayFileName;
-
-    // Los valores iniciales ya están seteados; a partir de acá cualquier edición
-    // de texto marca el form como sucio (para confirmar al cerrar sin guardar).
-    for (final c in [
-      _litersController,
-      _priceController,
-      _odometerController,
-      _notesController,
-    ]) {
-      c.addListener(_markDirty);
-    }
+        text: existing?.odometer == null
+            ? ''
+            : formatWithDots('${existing!.odometer}'));
+    _notesController = TextEditingController(text: existing?.notes ?? '');
+    _savedTexts = [for (final controller in _controllers) controller.text];
+    _receipt = existing?.receiptPhotoUrl == null
+        ? null
+        : (
+            url: existing!.receiptPhotoUrl!,
+            publicId: existing.receiptPhotoPublicId,
+            isPdf: existing.receiptIsPdf,
+            fileName: existing.receiptFileName,
+          );
+    _display = existing?.displayPhotoUrl == null
+        ? null
+        : (
+            url: existing!.displayPhotoUrl!,
+            publicId: existing.displayPhotoPublicId,
+            isPdf: existing.displayIsPdf,
+            fileName: existing.displayFileName,
+          );
   }
 
-  void _markDirty() {
-    if (!_hasChanges) _hasChanges = true;
-  }
+  List<TextEditingController> get _controllers => [
+        _litersController,
+        _priceController,
+        _odometerController,
+        _notesController,
+      ];
 
-  /// Vuelca al form lo que detectó el OCR. El valor primario del slot (precio
-  /// para el ticket, litros para el surtidor) pisa el campo; el secundario
-  /// solo completa si el campo está vacío, para no sobreescribir lo que ya
-  /// cargó el usuario o la otra foto.
-  void _applyOcrValues(OcrPhotoResult result, {required bool primaryIsPrice}) {
-    final price = result.extractedPrice;
-    if (price != null && (primaryIsPrice || _priceController.text.isEmpty)) {
-      _priceController.text = formatWithDots(price.toStringAsFixed(0));
-      _priceFromOcr = true;
-    }
-    final liters = result.extractedLiters;
-    if (liters != null && (!primaryIsPrice || _litersController.text.isEmpty)) {
-      _litersController.text = formatLitersAr(liters);
-      _litersFromOcr = true;
-    }
-  }
-
-  Future<void> _attemptClose() async {
-    if (_hasChanges) {
-      final discard = await confirmDiscard(context);
-      if (!discard) return;
-    }
-    if (mounted) Navigator.pop(context);
+  /// Comparado contra lo guardado: tocar un campo sin cambiarlo no cuenta.
+  bool get _isDirty {
+    final existing = widget.existing;
+    final textChanged = [
+      for (final (index, controller) in _controllers.indexed)
+        controller.text != _savedTexts[index],
+    ].any((changed) => changed);
+    return textChanged ||
+        !DateUtils.isSameDay(_date, _savedDate) ||
+        _receipt?.url != existing?.receiptPhotoUrl ||
+        _display?.url != existing?.displayPhotoUrl;
   }
 
   @override
   void dispose() {
-    _litersController.dispose();
-    _priceController.dispose();
-    _odometerController.dispose();
-    _notesController.dispose();
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  /// Vuelca lo que leyó el OCR. El valor principal de cada foto (precio en el
+  /// ticket, litros en el surtidor) pisa el campo; el otro solo completa si
+  /// el campo está vacío, para no pisar lo que ya cargó el usuario.
+  void _applyOcr(OcrPhotoResult result, OcrPhotoType type) {
+    final fromReceipt = type == OcrPhotoType.receipt;
+    final source = fromReceipt ? 'Leído del ticket' : 'Leído del surtidor';
+    final price = result.extractedPrice;
+    if (price != null && (fromReceipt || _priceController.text.isEmpty)) {
+      _priceController.text = formatWithDots(price.toStringAsFixed(0));
+      _priceReadFrom = source;
+    }
+    final liters = result.extractedLiters;
+    if (liters != null && (!fromReceipt || _litersController.text.isEmpty)) {
+      _litersController.text = formatLitersAr(liters);
+      _litersReadFrom = source;
+    }
+  }
+
+  void _onPhoto(OcrPhotoResult result, OcrPhotoType type) {
+    final url = result.cloudinaryUrl;
+    final photo = url == null
+        ? null
+        : (
+            url: url,
+            publicId: result.cloudinaryPublicId,
+            isPdf: result.isPdf,
+            fileName: result.fileName,
+          );
+    setState(() {
+      if (type == OcrPhotoType.receipt) {
+        _receipt = photo;
+      } else {
+        _display = photo;
+      }
+      _applyOcr(result, type);
+    });
+  }
+
+  static String? _validateLiters(String? value) {
+    if (value == null || value.isEmpty) return 'Ingresá los litros cargados';
+    final liters = double.tryParse(value.replaceAll(',', '.'));
+    if (liters == null) return 'Revisá los litros: tiene que ser un número';
+    if (liters <= 0) return 'Los litros tienen que ser más que 0';
+    if (liters > FuelCharge.maxPlausibleLiters) {
+      return 'Es mucho para una carga (máx. '
+          '${FuelCharge.maxPlausibleLiters.toInt()} L). ¿Falta la coma?';
+    }
+    return null;
+  }
+
+  static String? _validatePrice(String? value) {
+    if (value == null || value.isEmpty) return 'Ingresá el precio';
+    if (int.tryParse(value.replaceAll('.', '')) == null) {
+      return 'Revisá el precio: tiene que ser un número';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.existing != null;
-    final dateFormat = DateFormat('dd/MM/yyyy');
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+    final c = context.colors;
+    return AppSheet(
+      title: _isEditing ? 'Editar carga' : 'Nueva carga',
+      hasUnsavedChanges: _isDirty && !_isSaving,
+      footer: SizedBox(
+        width: double.infinity,
+        height: Sizes.controlH,
+        child: FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: Text(_isSaving ? 'Guardando…' : 'Guardar carga'),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+      ),
+      child: AppForm(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppDateField(
+              label: 'Fecha',
+              required: true,
+              value: _date,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              onChanged: (date) => setState(() => _date = date),
+            ),
+            const Gap(Space.s4),
+            Row(
               children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isEditing ? 'Editar Carga' : 'Nueva Carga',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _attemptClose,
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Date picker
-                GestureDetector(
-                  onTap: _pickDate,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 20, color: AppTheme.accentPrimary),
-                        const SizedBox(width: 12),
-                        Text(
-                          dateFormat.format(_selectedDate),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Photos section
-                const Text(
-                  'Fotos (opcional, OCR automático)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OcrPhotoCapture(
-                        type: OcrPhotoType.receipt,
-                        initialPhotoUrl: _receiptPhotoUrl,
-                        showOcrIndicator: _priceFromOcr,
-                        onPhotoResult: (result) {
-                          setState(() {
-                            _receiptPhotoUrl = result.cloudinaryUrl;
-                            _receiptPhotoPublicId = result.cloudinaryPublicId;
-                            _receiptIsPdf = result.isPdf;
-                            _receiptFileName = result.fileName;
-                            _applyOcrValues(result, primaryIsPrice: true);
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OcrPhotoCapture(
-                        type: OcrPhotoType.display,
-                        initialPhotoUrl: _displayPhotoUrl,
-                        showOcrIndicator: _litersFromOcr,
-                        onPhotoResult: (result) {
-                          setState(() {
-                            _displayPhotoUrl = result.cloudinaryUrl;
-                            _displayPhotoPublicId = result.cloudinaryPublicId;
-                            _displayIsPdf = result.isPdf;
-                            _displayFileName = result.fileName;
-                            _applyOcrValues(result, primaryIsPrice: false);
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Liters field
-                TextFormField(
-                  controller: _litersController,
-                  decoration: InputDecoration(
-                    labelText: 'Litros *',
-                    hintText: 'Ej: 23,562',
-                    suffixText: 'L',
-                    suffixIcon: _litersFromOcr
-                        ? const Icon(Icons.check_circle, color: AppTheme.success, size: 20)
-                        : null,
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [DecimalCommaFormatter()],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Ingrese los litros';
-                    }
-                    final liters = double.tryParse(value.replaceAll(',', '.'));
-                    if (liters == null) {
-                      return 'Número inválido';
-                    }
-                    if (liters <= 0) {
-                      return 'Los litros deben ser mayores a 0';
-                    }
-                    if (liters > FuelCharge.maxPlausibleLiters) {
-                      return 'Valor muy alto (máx. ${FuelCharge.maxPlausibleLiters.toInt()} L). ¿Faltó la coma decimal?';
-                    }
-                    return null;
-                  },
-                  onChanged: (_) {
-                    if (_litersFromOcr) setState(() => _litersFromOcr = false);
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Price field
-                TextFormField(
-                  controller: _priceController,
-                  decoration: InputDecoration(
-                    labelText: 'Precio *',
-                    prefixText: '\$ ',
-                    suffixIcon: _priceFromOcr
-                        ? const Icon(Icons.check_circle, color: AppTheme.success, size: 20)
-                        : null,
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [ThousandsSeparatorFormatter()],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Ingrese el precio';
-                    }
-                    if (int.tryParse(value.replaceAll('.', '')) == null) {
-                      return 'Número inválido';
-                    }
-                    return null;
-                  },
-                  onChanged: (_) {
-                    if (_priceFromOcr) setState(() => _priceFromOcr = false);
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Odometer field
-                TextFormField(
-                  controller: _odometerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Odómetro (opcional)',
-                    suffixText: 'km',
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      if (int.tryParse(value.replaceAll('.', '').replaceAll(',', '')) == null) {
-                        return 'Número inválido';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Notes field
-                TextFormField(
-                  controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notas (opcional)',
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 24),
-
-                // Save button
-                ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isEditing ? 'GUARDAR CAMBIOS' : 'GUARDAR'),
-                ),
-                const SizedBox(height: 16),
+                const Expanded(child: FieldLabel('Fotos')),
+                Text('Se leen litros y precio',
+                    style: AppText.caption.copyWith(color: c.textMuted)),
               ],
             ),
-          ),
+            const Gap(Space.s2),
+            Row(
+              children: [
+                Expanded(
+                  child: OcrPhotoCapture(
+                    type: OcrPhotoType.receipt,
+                    initialPhotoUrl: _receipt?.url,
+                    initialIsPdf: _receipt?.isPdf ?? false,
+                    initialFileName: _receipt?.fileName,
+                    onPhotoResult: (result) =>
+                        _onPhoto(result, OcrPhotoType.receipt),
+                  ),
+                ),
+                const Gap(Space.s3),
+                Expanded(
+                  child: OcrPhotoCapture(
+                    type: OcrPhotoType.display,
+                    initialPhotoUrl: _display?.url,
+                    initialIsPdf: _display?.isPdf ?? false,
+                    initialFileName: _display?.fileName,
+                    onPhotoResult: (result) =>
+                        _onPhoto(result, OcrPhotoType.display),
+                  ),
+                ),
+              ],
+            ),
+            const Gap(Space.s4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: AppTextField(
+                    label: 'Litros',
+                    required: true,
+                    controller: _litersController,
+                    hint: '23,562',
+                    suffixText: 'L',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [DecimalCommaFormatter()],
+                    helper: _litersReadFrom,
+                    helperTone: Tone.success,
+                    validator: _validateLiters,
+                    onChanged: (_) => setState(() => _litersReadFrom = null),
+                  ),
+                ),
+                const Gap(Space.s3),
+                Expanded(
+                  child: AppTextField(
+                    label: 'Precio',
+                    required: true,
+                    controller: _priceController,
+                    hint: '30.000',
+                    prefixText: r'$ ',
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [ThousandsSeparatorFormatter()],
+                    helper: _priceReadFrom,
+                    helperTone: Tone.success,
+                    validator: _validatePrice,
+                    onChanged: (_) => setState(() => _priceReadFrom = null),
+                  ),
+                ),
+              ],
+            ),
+            const Gap(Space.s4),
+            AppTextField(
+              label: 'Odómetro',
+              controller: _odometerController,
+              hint: 'Opcional',
+              suffixText: 'km',
+              keyboardType: TextInputType.number,
+              inputFormatters: [ThousandsSeparatorFormatter()],
+              onChanged: (_) => setState(() {}),
+              helper: 'Si es mayor, actualiza el kilometraje del vehículo',
+            ),
+            const Gap(Space.s4),
+            AppTextField(
+              label: 'Notas',
+              controller: _notesController,
+              hint: 'Estación, tipo de combustible…',
+              maxLines: 3,
+              minLines: 1,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_isEditing) ...[
+              const Gap(Space.s4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: AppButtonStyles.dangerText(context),
+                  onPressed: _isSaving
+                      ? null
+                      : () => Navigator.pop(
+                          context, FuelChargeSheetResult.deleteRequested),
+                  icon: const Icon(Icons.delete_rounded),
+                  label: const Text('Eliminar carga'),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validateAndReveal()) return;
+    final liters = double.tryParse(_litersController.text.replaceAll(',', '.'));
+    final price = double.tryParse(_priceController.text.replaceAll('.', ''));
+    if (liters == null || price == null) return;
+    final odometerText = _odometerController.text.replaceAll('.', '');
+    final odometer = odometerText.isEmpty ? null : int.tryParse(odometerText);
+    final notes = _notesController.text.trim();
 
     setState(() => _isSaving = true);
-
     try {
-      final liters = double.tryParse(_litersController.text.replaceAll(',', '.'));
-      final priceText = _priceController.text.replaceAll('.', '').replaceAll(',', '.');
-      final price = double.tryParse(priceText);
-      final odometer = _odometerController.text.isNotEmpty
-          ? int.tryParse(_odometerController.text.replaceAll('.', '').replaceAll(',', ''))
-          : null;
-      if (liters == null || price == null) {
-        // El validator debería prevenirlo; si igual llega un valor no numérico,
-        // abortamos limpio en vez de lanzar FormatException.
-        if (mounted) setState(() => _isSaving = false);
-        return;
-      }
-      final notes = _notesController.text.isNotEmpty ? _notesController.text : null;
-
-      final fuelCharge = FuelCharge(
+      final charge = FuelCharge(
         id: widget.existing?.id,
         vehicleId: widget.vehicleId,
-        date: _selectedDate,
+        date: _date,
         liters: liters,
         price: price,
         odometer: odometer,
-        receiptPhotoUrl: _receiptPhotoUrl,
-        receiptPhotoPublicId: _receiptPhotoPublicId,
-        receiptIsPdf: _receiptIsPdf,
-        receiptFileName: _receiptFileName,
-        displayPhotoUrl: _displayPhotoUrl,
-        displayPhotoPublicId: _displayPhotoPublicId,
-        displayIsPdf: _displayIsPdf,
-        displayFileName: _displayFileName,
-        notes: notes,
+        receiptPhotoUrl: _receipt?.url,
+        receiptPhotoPublicId: _receipt?.publicId,
+        receiptIsPdf: _receipt?.isPdf ?? false,
+        receiptFileName: _receipt?.fileName,
+        displayPhotoUrl: _display?.url,
+        displayPhotoPublicId: _display?.publicId,
+        displayIsPdf: _display?.isPdf ?? false,
+        displayFileName: _display?.fileName,
+        notes: notes.isEmpty ? null : notes,
         createdAt: widget.existing?.createdAt,
       );
-
       final repo = ref.read(fuelChargeRepositoryProvider);
-
-      if (widget.existing != null) {
-        await repo.updateFuelCharge(fuelCharge);
+      if (_isEditing) {
+        await repo.updateFuelCharge(charge);
       } else {
-        await repo.insertFuelCharge(fuelCharge);
+        await repo.insertFuelCharge(charge);
       }
-
-      // Update vehicle km if odometer was entered
-      if (odometer != null) {
-        final vehicle = await ref.read(vehicleByIdProvider(widget.vehicleId).future);
-        if (vehicle != null && odometer > vehicle.km) {
-          final updatedVehicle = vehicle.copyWith(km: odometer);
-          await ref.read(vehicleNotifierProvider.notifier).updateVehicle(updatedVehicle);
-          // Invalidate the vehicle provider to refresh the UI
-          ref.invalidate(vehicleByIdProvider(widget.vehicleId));
-        }
-      }
-
-      widget.onSaved();
-
+      if (odometer != null) await _raiseVehicleKm(odometer);
+      if (mounted) Navigator.pop(context, FuelChargeSheetResult.saved);
+    } catch (_) {
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.existing != null ? 'Carga actualizada' : 'Carga guardada'),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo guardar la carga')),
-        );
+        AppSnack.error(context, 'No se pudo guardar la carga. Revisá la conexión.');
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  /// Un odómetro mayor al kilometraje cargado lo actualiza.
+  Future<void> _raiseVehicleKm(int odometer) async {
+    final vehicle = await ref.read(vehicleByIdProvider(widget.vehicleId).future);
+    if (vehicle == null || odometer <= vehicle.km) return;
+    await ref
+        .read(vehicleNotifierProvider.notifier)
+        .updateVehicle(vehicle.copyWith(km: odometer));
+    ref.invalidate(vehicleByIdProvider(widget.vehicleId));
   }
 }

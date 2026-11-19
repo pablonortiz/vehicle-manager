@@ -52,5 +52,15 @@ void main() {
       );
       expect(consumptionPoints([]), isEmpty);
     });
+
+    test('devuelve los tramos en orden de fecha aunque el odómetro venga cruzado', () {
+      final pts = consumptionPoints([
+        _c(date: DateTime(2026, 3, 1), liters: 40, odometer: 1000),
+        _c(date: DateTime(2026, 1, 1), liters: 40, odometer: 1400),
+        _c(date: DateTime(2026, 2, 1), liters: 50, odometer: 1900),
+      ]);
+      expect(pts.map((point) => point.date),
+          [DateTime(2026, 1, 1), DateTime(2026, 2, 1)]);
+    });
   });
 }

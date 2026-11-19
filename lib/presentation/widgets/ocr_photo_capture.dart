@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../../data/services/ocr_service.dart';
 import '../../data/services/cloudinary_service.dart';
+import 'app_sheet.dart';
+import 'app_snack.dart';
+import 'app_tag.dart';
 import 'ocr_photo_types.dart';
 import 'ocr_image_viewer.dart';
 
@@ -14,17 +20,21 @@ import 'ocr_image_viewer.dart';
 // importando solo ocr_photo_capture.dart.
 export 'ocr_photo_types.dart';
 
+/// Foto de un ticket o de un surtidor: al cargarla se lee con OCR y se sube.
+/// Tocar la foto la abre; "Quitar foto" la saca.
 class OcrPhotoCapture extends StatefulWidget {
   final OcrPhotoType type;
   final String? initialPhotoUrl;
-  final bool showOcrIndicator;
+  final bool initialIsPdf;
+  final String? initialFileName;
   final ValueChanged<OcrPhotoResult> onPhotoResult;
 
   const OcrPhotoCapture({
     super.key,
     required this.type,
     this.initialPhotoUrl,
-    this.showOcrIndicator = false,
+    this.initialIsPdf = false,
+    this.initialFileName,
     required this.onPhotoResult,
   });
 
@@ -40,11 +50,16 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
   bool _isPdf = false;
   String? _fileName;
 
+  bool get _isReceipt => widget.type == OcrPhotoType.receipt;
+  String get _label => _isReceipt ? 'Ticket' : 'Surtidor';
+  String get _ofLabel => _isReceipt ? 'del ticket' : 'del surtidor';
+
   @override
   void initState() {
     super.initState();
     _photoUrl = widget.initialPhotoUrl;
-    _ocrDetected = widget.showOcrIndicator;
+    _isPdf = widget.initialIsPdf;
+    _fileName = widget.initialFileName;
   }
 
   void _safeSetState(VoidCallback fn) {
@@ -53,179 +68,111 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
   @override
   Widget build(BuildContext context) {
-    final isReceipt = widget.type == OcrPhotoType.receipt;
-    final label = isReceipt ? 'Ticket' : 'Surtidor';
-    final icon = isReceipt ? Icons.receipt_long : Icons.local_gas_station;
-
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _ocrDetected ? AppTheme.success : AppTheme.border,
-          width: _ocrDetected ? 2 : 1,
+    final c = context.colors;
+    return SizedBox(
+      height: 112,
+      child: Material(
+        color: c.surfaceRaised,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: Radii.mdAll,
+          side: BorderSide(
+            color: _ocrDetected ? c.success : c.border,
+            width: _ocrDetected ? 2 : 1,
+          ),
         ),
+        child: _isProcessing
+            ? const Center(child: CircularProgressIndicator())
+            : _photoUrl != null
+                ? _buildPhotoPreview(c)
+                : _buildCaptureButton(c),
       ),
-      child: _isProcessing
-          ? const Center(child: CircularProgressIndicator())
-          : _photoUrl != null
-              ? _buildPhotoPreview()
-              : _buildCaptureButton(icon, label),
     );
   }
 
-  Widget _buildCaptureButton(IconData icon, String label) {
-    return Material(
-      color: Colors.transparent,
+  Widget _buildCaptureButton(AppColors c) {
+    return Semantics(
+      button: true,
+      label: 'Agregar foto $_ofLabel',
+      excludeSemantics: true,
+      onTap: _showPickerOptions,
       child: InkWell(
         onTap: _showPickerOptions,
-        borderRadius: BorderRadius.circular(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppTheme.accentPrimary, size: 28),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-              ),
+            Icon(
+              _isReceipt
+                  ? Icons.receipt_long_rounded
+                  : Icons.local_gas_station_rounded,
+              color: c.accent,
+              size: Sizes.iconLg,
             ),
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.accentPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'OCR',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.accentPrimary,
-                ),
-              ),
-            ),
+            const Gap(Space.s1),
+            Text(_label, style: AppText.label.copyWith(color: c.text)),
+            Text('Agregar foto', style: AppText.caption.copyWith(color: c.textMuted)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPhotoPreview() {
+  Widget _buildPhotoPreview(AppColors c) {
+    final open = _isPdf ? _showPdfPreviewDialog : _showFullScreenImage;
     return Stack(
+      fit: StackFit.expand,
       children: [
-        // Tappable image/pdf to view fullscreen
-        GestureDetector(
-          onTap: _isPdf
-              ? () => _showPdfPreviewDialog()
-              : _showFullScreenImage,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: _isPdf
-                ? Container(
-                    color: AppTheme.surfaceLight,
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.picture_as_pdf, color: Colors.red, size: 32),
-                        const SizedBox(height: 2),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            _fileName ?? 'PDF',
-                            style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : CachedNetworkImage(
-                    imageUrl: _photoUrl!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    placeholder: (_, _) => const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
+        if (_isPdf)
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.picture_as_pdf_rounded,
+                  color: c.textMuted, size: Sizes.iconLg),
+              const Gap(Space.s1),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.s2),
+                child: Text(
+                  _fileName ?? 'PDF',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: c.textMuted),
+                ),
+              ),
+            ],
+          )
+        else
+          CachedNetworkImage(
+            imageUrl: _photoUrl!,
+            fit: BoxFit.cover,
+            placeholder: (_, _) =>
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            errorWidget: (_, _, _) =>
+                Icon(Icons.broken_image_rounded, color: c.textMuted),
+          ),
+        Semantics(
+          button: true,
+          label: 'Ver foto $_ofLabel',
+          excludeSemantics: true,
+          onTap: open,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(onTap: open),
           ),
         ),
-        // Expand icon overlay
         Positioned(
-          bottom: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: _showFullScreenImage,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.zoom_in,
-                size: 14,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-        // Remove button
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: _removePhoto,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AppTheme.error,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close,
-                size: 14,
-                color: Colors.white,
-              ),
-            ),
+          top: Space.s1,
+          right: Space.s1,
+          child: IconButton.filledTonal(
+            tooltip: 'Quitar foto',
+            onPressed: _removePhoto,
+            icon: const Icon(Icons.close_rounded),
           ),
         ),
         if (_ocrDetected)
-          Positioned(
-            bottom: 4,
-            left: 4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.success,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check, size: 10, color: Colors.white),
-                  SizedBox(width: 2),
-                  Text(
-                    'OCR',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const Positioned(
+            left: Space.s2,
+            bottom: Space.s2,
+            child: AppTag('Leído', tone: Tone.success),
           ),
       ],
     );
@@ -253,42 +200,37 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
     );
   }
 
-  void _showPickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Cámara'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _capturePhoto(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Galería'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _capturePhoto(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_file),
-              title: const Text('Archivo (PDF/Imagen)'),
-              subtitle: const Text('Sin OCR para PDFs', style: TextStyle(fontSize: 12)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickFile();
-              },
-            ),
-          ],
+  Future<void> _showPickerOptions() async {
+    final source = await showAppOptionsSheet<String>(
+      context,
+      title: 'Foto $_ofLabel',
+      options: const [
+        AppSheetOption(
+          value: 'camera',
+          icon: Icons.photo_camera_rounded,
+          label: 'Cámara',
         ),
-      ),
+        AppSheetOption(
+          value: 'gallery',
+          icon: Icons.photo_library_rounded,
+          label: 'Galería',
+        ),
+        AppSheetOption(
+          value: 'file',
+          icon: Icons.attach_file_rounded,
+          label: 'Archivo',
+          description: 'PDF o imagen, sin lectura automática',
+        ),
+      ],
     );
+    switch (source) {
+      case 'camera':
+        await _capturePhoto(ImageSource.camera);
+      case 'gallery':
+        await _capturePhoto(ImageSource.gallery);
+      case 'file':
+        await _pickFile();
+    }
   }
 
   Future<void> _capturePhoto(ImageSource source) async {
@@ -349,46 +291,33 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
           ocrText: ocrResult.fullText,
         ));
 
-        // Show snackbar with OCR result info
-        if (mounted) {
-          if (ocrResult.success) {
-            final detected = [
-              if (ocrResult.liters != null)
-                'litros: ${formatLitersAr(ocrResult.liters!)}',
-              if (ocrResult.price != null)
-                'precio: \$${formatWithDots(ocrResult.price!.toStringAsFixed(0))}',
-            ].join(' · ');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('OCR detectó $detected'),
-                backgroundColor: AppTheme.success,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          } else if (ocrResult.fullText != null && ocrResult.fullText!.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('OCR no encontró el valor. Toca la imagen para ver más detalles.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        }
+        if (mounted) _reportOcr(ocrResult);
       } else {
         _safeSetState(() => _isProcessing = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al subir la foto')),
-          );
+          AppSnack.error(context, 'No se pudo subir la foto. Revisá la conexión.');
         }
       }
-    } catch (e) {
+    } catch (_) {
       _safeSetState(() => _isProcessing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo subir el archivo')),
-        );
+        AppSnack.error(context, 'No se pudo subir la foto. Revisá la conexión.');
       }
+    }
+  }
+
+  /// Cuenta qué se leyó; si no se encontró el valor, cómo ver el texto leído.
+  void _reportOcr(FuelOcrResult ocrResult) {
+    if (ocrResult.success) {
+      final detected = [
+        if (ocrResult.liters != null) 'litros ${formatLitersAr(ocrResult.liters!)}',
+        if (ocrResult.price != null)
+          'precio \$ ${formatWithDots(ocrResult.price!.toStringAsFixed(0))}',
+      ].join(' · ');
+      AppSnack.success(context, 'Se leyó $detected');
+    } else if (ocrResult.fullText?.isNotEmpty ?? false) {
+      AppSnack.info(
+          context, 'No se encontró el valor. Tocá la foto para ver lo que se leyó.');
     }
   }
 
@@ -447,17 +376,13 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       } else {
         _safeSetState(() => _isProcessing = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al subir el archivo')),
-          );
+          AppSnack.error(context, 'No se pudo subir el archivo. Revisá la conexión.');
         }
       }
-    } catch (e) {
+    } catch (_) {
       _safeSetState(() => _isProcessing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo subir el archivo')),
-        );
+        AppSnack.error(context, 'No se pudo subir el archivo. Revisá la conexión.');
       }
     }
   }

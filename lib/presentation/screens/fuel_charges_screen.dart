@@ -1,33 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/utils/confirm_dialog.dart';
-import '../widgets/error_retry_view.dart';
-import '../widgets/empty_state.dart';
+import 'package:intl/intl.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
-import '../widgets/month_navigator.dart';
-import '../widgets/fuel_summary_card.dart';
-import '../widgets/fuel_charge_card.dart';
-import '../widgets/fuel_charts.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_notice.dart';
+import '../widgets/app_snack.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_retry_view.dart';
 import '../widgets/fuel_charge_form_sheet.dart';
+import '../widgets/fuel_charge_row.dart';
+import '../widgets/fuel_charts.dart';
+import '../widgets/fuel_month_summary.dart';
+import '../widgets/month_navigator.dart';
+import '../widgets/section_header.dart';
 
+/// Cargas de combustible de un vehículo, mes por mes: el resumen del mes, sus
+/// cargas y, a pedido, los gráficos de los últimos seis meses.
 class FuelChargesScreen extends ConsumerStatefulWidget {
   final String vehicleId;
 
-  const FuelChargesScreen({
-    super.key,
-    required this.vehicleId,
-  });
+  const FuelChargesScreen({super.key, required this.vehicleId});
 
   @override
   ConsumerState<FuelChargesScreen> createState() => _FuelChargesScreenState();
 }
 
 class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
+  static const _chartMonths = 6;
+
   bool _showCharts = false;
-  // Borrado diferido: ocultas mientras corre el SnackBar de "Deshacer".
+  // Borrado diferido: ocultas mientras corre el snackbar de "Deshacer".
   final Set<String> _pendingDeleteIds = {};
+
+  ChartDataParams get _chartParams =>
+      ChartDataParams(vehicleId: widget.vehicleId, months: _chartMonths);
+
+  MonthlyFuelParams _monthParams(SelectedMonthState month) => MonthlyFuelParams(
+        vehicleId: widget.vehicleId,
+        year: month.year,
+        month: month.month,
+      );
 
   @override
   void initState() {
@@ -36,8 +53,8 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
         .addPostFrameCallback((_) => _jumpToLatestMonthWithData());
   }
 
-  /// Si el mes seleccionado (el actual, al abrir) no tiene cargas, arranca en
-  /// el último mes que sí tenga, en vez de mostrar un mes vacío.
+  /// Si el mes actual no tiene cargas, arranca en el último mes que sí tenga,
+  /// en vez de mostrar un mes vacío.
   Future<void> _jumpToLatestMonthWithData() async {
     final charges =
         await ref.read(fuelChargesByVehicleProvider(widget.vehicleId).future);
@@ -45,228 +62,244 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
 
     final selected = ref.read(selectedMonthProvider(widget.vehicleId));
     final now = DateTime.now();
-    final userNavigated = selected.year != now.year || selected.month != now.month;
+    final userNavigated =
+        selected.year != now.year || selected.month != now.month;
     if (userNavigated) return;
 
-    final hasChargesInSelected = charges.any(
-        (c) => c.date.year == selected.year && c.date.month == selected.month);
+    final hasChargesInSelected = charges.any((charge) =>
+        charge.date.year == selected.year &&
+        charge.date.month == selected.month);
     if (hasChargesInSelected) return;
 
     final latest = charges
-        .map((c) => c.date)
-        .reduce((a, b) => a.isAfter(b) ? a : b);
+        .map((charge) => charge.date)
+        .reduce((date, other) => date.isAfter(other) ? date : other);
     ref.read(selectedMonthProvider(widget.vehicleId).notifier).state =
         SelectedMonthState(year: latest.year, month: latest.month);
   }
 
+  void _refreshCharges() {
+    final params =
+        _monthParams(ref.read(selectedMonthProvider(widget.vehicleId)));
+    ref.invalidate(fuelChargesByMonthProvider(params));
+    ref.invalidate(fuelChargeSummaryProvider(params));
+    ref.invalidate(fuelChartDataProvider(_chartParams));
+    ref.invalidate(fuelChargesByVehicleProvider(widget.vehicleId));
+    ref.invalidate(recentFuelChargesProvider(widget.vehicleId));
+  }
+
+  void _selectMonth(SelectedMonthState month) =>
+      ref.read(selectedMonthProvider(widget.vehicleId).notifier).state = month;
+
+  /// "noviembre", o "noviembre de 2025" si no es el año actual.
+  static String _monthName(SelectedMonthState month) {
+    final date = DateTime(month.year, month.month);
+    final pattern = month.year == DateTime.now().year ? 'MMMM' : "MMMM 'de' y";
+    return DateFormat(pattern, 'es_AR').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final selectedMonth = ref.watch(selectedMonthProvider(widget.vehicleId));
-    final chargesParams = MonthlyFuelParams(
-      vehicleId: widget.vehicleId,
-      year: selectedMonth.year,
-      month: selectedMonth.month,
-    );
-    final chargesAsync = ref.watch(fuelChargesByMonthProvider(chargesParams));
-    final summaryAsync = ref.watch(fuelChargeSummaryProvider(chargesParams));
-    final chartDataAsync = ref.watch(fuelChartDataProvider(
-      ChartDataParams(vehicleId: widget.vehicleId, months: 6),
-    ));
-    final allChargesAsync =
-        ref.watch(fuelChargesByVehicleProvider(widget.vehicleId));
+    final params = _monthParams(selectedMonth);
+    final monthName = _monthName(selectedMonth);
+    final summaryAsync = ref.watch(fuelChargeSummaryProvider(params));
+    final chargesAsync = ref.watch(fuelChargesByMonthProvider(params));
+    final hasSummary = (summaryAsync.valueOrNull?.chargeCount ?? 0) > 0 ||
+        summaryAsync.hasError;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cargas de Combustible'),
+        title: const Text('Cargas de combustible'),
         actions: [
           IconButton(
-            onPressed: () {
-              setState(() => _showCharts = !_showCharts);
-            },
-            icon: Icon(
-              _showCharts ? Icons.bar_chart : Icons.bar_chart_outlined,
-              color: _showCharts ? AppTheme.accentPrimary : AppTheme.textSecondary,
-            ),
-            tooltip: 'Ver estadísticas',
+            tooltip: _showCharts ? 'Ocultar gráficos' : 'Ver gráficos',
+            isSelected: _showCharts,
+            onPressed: () => setState(() => _showCharts = !_showCharts),
+            icon: const Icon(Icons.bar_chart_rounded),
+            selectedIcon: Icon(Icons.bar_chart_rounded, color: c.accent),
           ),
+          const Gap(Space.s1),
         ],
       ),
       body: Column(
         children: [
           MonthNavigator(
             selectedMonth: selectedMonth,
-            onPreviousMonth: () {
-              ref.read(selectedMonthProvider(widget.vehicleId).notifier).state =
-                  selectedMonth.previousMonth();
-            },
-            onNextMonth: () {
-              ref.read(selectedMonthProvider(widget.vehicleId).notifier).state =
-                  selectedMonth.nextMonth();
-            },
+            onPreviousMonth: () => _selectMonth(selectedMonth.previousMonth()),
+            onNextMonth: () => _selectMonth(selectedMonth.nextMonth()),
+            onSelectMonth: _selectMonth,
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(fuelChargesByMonthProvider(chargesParams));
-                ref.invalidate(fuelChargeSummaryProvider(chargesParams));
-                ref.invalidate(fuelChartDataProvider(
-                  ChartDataParams(vehicleId: widget.vehicleId, months: 6),
-                ));
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Summary card (si el mes está vacío, alcanza con el
-                    // empty state de la lista — no duplicar el mensaje)
-                    summaryAsync.when(
-                      data: (summary) => summary.chargeCount == 0
-                          ? const SizedBox.shrink()
-                          : FuelSummaryCard(summary: summary),
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: CircularProgressIndicator(),
-                      ),
-                      error: (e, _) => ErrorRetryView(
-                        message: 'No se pudo cargar el resumen',
-                        onRetry: () =>
-                            ref.invalidate(fuelChargeSummaryProvider(chargesParams)),
-                      ),
-                    ),
-                    // Charts section (collapsible)
-                    if (_showCharts)
-                      chartDataAsync.when(
-                        data: (data) => FuelCharts(
-                          data: data,
-                          charges: allChargesAsync.valueOrNull ?? const [],
-                        ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: CircularProgressIndicator(),
-                        ),
-                        error: (e, _) => const SizedBox.shrink(),
-                      ),
-                    if (_showCharts) const SizedBox(height: 16),
-                    // Charges list
-                    chargesAsync.when(
-                      data: (charges) {
-                        if (charges.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: EmptyState(
-                              icon: Icons.local_gas_station_outlined,
-                              title: 'No hay cargas este mes',
-                              actionLabel: 'Agregar carga',
-                              onAction: () => _showFuelChargeForm(null),
-                            ),
-                          );
-                        }
-                        return Column(
-                          children: charges
-                              .where((c) => !_pendingDeleteIds.contains(c.id))
-                              .map((charge) => FuelChargeCard(
-                                    fuelCharge: charge,
-                                    onTap: () => _showFuelChargeForm(charge),
-                                    onDelete: () => _deleteCharge(charge),
-                                  ))
-                              .toList(),
-                        );
-                      },
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: CircularProgressIndicator(),
-                      ),
-                      error: (e, _) => ErrorRetryView(
-                        message: 'No se pudieron cargar las cargas',
-                        onRetry: () =>
-                            ref.invalidate(fuelChargesByMonthProvider(chargesParams)),
-                      ),
-                    ),
-                    const SizedBox(height: 80), // Space for FAB
+              onRefresh: () async => _refreshCharges(),
+              child: ListView(
+                // Abajo, lugar para que el FAB no tape la última carga.
+                padding: const EdgeInsets.fromLTRB(
+                    Space.s5, Space.s2, Space.s5, Space.s10 * 2 + Space.s4),
+                children: [
+                  if (hasSummary) ...[
+                    _buildSummary(summaryAsync, params, monthName),
+                    const Gap(Space.s6),
                   ],
-                ),
+                  if (_showCharts) ...[
+                    _buildCharts(),
+                    const Gap(Space.s6),
+                  ],
+                  _buildCharges(chargesAsync, params, monthName),
+                ],
               ),
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showFuelChargeForm(null),
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        tooltip: 'Agregar carga',
+        onPressed: () => _openSheet(null),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Carga'),
       ),
     );
   }
 
-  Future<void> _deleteCharge(FuelCharge charge) async {
-    final confirmed = await confirmDelete(
-      context,
-      title: 'Eliminar carga',
-      message: '¿Eliminar esta carga de combustible?',
+  Widget _buildSummary(
+    AsyncValue<FuelChargeSummary> summaryAsync,
+    MonthlyFuelParams params,
+    String monthName,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader('Resumen de $monthName'),
+        const Gap(Space.s2),
+        summaryAsync.when(
+          data: (summary) => FuelMonthSummary(summary: summary),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudo cargar el resumen del mes.',
+            onRetry: () => ref.invalidate(fuelChargeSummaryProvider(params)),
+          ),
+        ),
+      ],
     );
-    if (!confirmed || charge.id == null || !mounted) return;
+  }
 
-    // Diferido: se oculta ya, y el delete real corre cuando expira el
-    // SnackBar (si el usuario no tocó "Deshacer").
-    final messenger = ScaffoldMessenger.of(context);
+  Widget _buildCharts() {
+    final c = context.colors;
+    final chartAsync = ref.watch(fuelChartDataProvider(_chartParams));
+    final allCharges =
+        ref.watch(fuelChargesByVehicleProvider(widget.vehicleId)).valueOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeader('Últimos $_chartMonths meses'),
+        const Gap(Space.s2),
+        chartAsync.when(
+          data: (data) => data.every((month) => month.totalLiters == 0)
+              ? AppCard(
+                  child: Text(
+                    'Todavía no hay cargas para graficar.',
+                    style: AppText.body.copyWith(color: c.textMuted),
+                  ),
+                )
+              : FuelCharts(data: data, charges: allCharges ?? const []),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudieron cargar los gráficos.',
+            onRetry: () => ref.invalidate(fuelChartDataProvider(_chartParams)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCharges(
+    AsyncValue<List<FuelCharge>> chargesAsync,
+    MonthlyFuelParams params,
+    String monthName,
+  ) {
+    return chargesAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(Space.s8),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => ErrorRetryView(
+        message: 'No se pudieron cargar las cargas',
+        onRetry: () => ref.invalidate(fuelChargesByMonthProvider(params)),
+      ),
+      data: (charges) {
+        final visible = charges
+            .where((charge) => !_pendingDeleteIds.contains(charge.id))
+            .toList();
+        // La acción de agregar ya está en el FAB: el vacío no la repite.
+        if (visible.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(top: Space.s8),
+            child: EmptyState(
+              icon: Icons.local_gas_station_rounded,
+              title: 'No hay cargas en $monthName',
+              message: 'Agregá una con el botón Carga.',
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionHeader('Cargas', count: visible.length),
+            const Gap(Space.s2),
+            AppCard.list(
+              children: [
+                for (final charge in visible)
+                  FuelChargeRow(
+                    charge: charge,
+                    onTap: () => _openSheet(charge),
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openSheet(FuelCharge? charge) async {
+    final result = await showFuelChargeSheet(
+      context,
+      vehicleId: widget.vehicleId,
+      existing: charge,
+    );
+    if (!mounted) return;
+    switch (result) {
+      case FuelChargeSheetResult.saved:
+        _refreshCharges();
+        AppSnack.success(context, 'Carga guardada');
+      case FuelChargeSheetResult.deleteRequested:
+        await _deleteCharge(charge!);
+      case null:
+        break;
+    }
+  }
+
+  /// Reversible: sin diálogo, con "Deshacer". Una vez borrada queda oculta
+  /// hasta que llega la lista nueva, sin parpadeo.
+  Future<void> _deleteCharge(FuelCharge charge) async {
+    final id = charge.id;
+    if (id == null) return;
     final repo = ref.read(fuelChargeRepositoryProvider);
-    setState(() => _pendingDeleteIds.add(charge.id!));
-
-    final controller = messenger.showSnackBar(SnackBar(
-      content: const Text('Carga eliminada'),
-      duration: const Duration(seconds: 5),
-      action: SnackBarAction(label: 'Deshacer', onPressed: () {}),
-    ));
-    final reason = await controller.closed;
-
-    if (reason == SnackBarClosedReason.action) {
-      if (mounted) setState(() => _pendingDeleteIds.remove(charge.id));
+    setState(() => _pendingDeleteIds.add(id));
+    final commit = await AppSnack.undoableDelete(context, 'Carga eliminada');
+    if (!commit) {
+      if (mounted) setState(() => _pendingDeleteIds.remove(id));
       return;
     }
     try {
-      await repo.deleteFuelCharge(charge.id!);
-      if (mounted) {
-        final selectedMonth =
-            ref.read(selectedMonthProvider(widget.vehicleId));
-        final params = MonthlyFuelParams(
-          vehicleId: widget.vehicleId,
-          year: selectedMonth.year,
-          month: selectedMonth.month,
-        );
-        ref.invalidate(fuelChargesByMonthProvider(params));
-        ref.invalidate(fuelChargeSummaryProvider(params));
-        ref.invalidate(fuelChartDataProvider(
-          ChartDataParams(vehicleId: widget.vehicleId, months: 6),
-        ));
-        ref.invalidate(recentFuelChargesProvider(widget.vehicleId));
-      }
-    } finally {
-      if (mounted) setState(() => _pendingDeleteIds.remove(charge.id));
+      await repo.deleteFuelCharge(id);
+      if (mounted) _refreshCharges();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pendingDeleteIds.remove(id));
+      AppSnack.error(context, 'No se pudo eliminar la carga');
     }
-  }
-
-  void _showFuelChargeForm(FuelCharge? existing) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => FuelChargeFormSheet(
-        vehicleId: widget.vehicleId,
-        existing: existing,
-        onSaved: () {
-          final selectedMonth = ref.read(selectedMonthProvider(widget.vehicleId));
-          final params = MonthlyFuelParams(
-            vehicleId: widget.vehicleId,
-            year: selectedMonth.year,
-            month: selectedMonth.month,
-          );
-          ref.invalidate(fuelChargesByMonthProvider(params));
-          ref.invalidate(fuelChargeSummaryProvider(params));
-          ref.invalidate(fuelChartDataProvider(
-            ChartDataParams(vehicleId: widget.vehicleId, months: 6),
-          ));
-          ref.invalidate(recentFuelChargesProvider(widget.vehicleId));
-        },
-      ),
-    );
   }
 }

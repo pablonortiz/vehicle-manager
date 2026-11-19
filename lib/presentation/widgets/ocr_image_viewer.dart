@@ -1,11 +1,18 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import '../../core/theme/app_theme.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
+import '../../core/theme/app_typography.dart';
 import '../../data/services/pdf_service.dart';
+import 'app_sheet.dart';
+import 'empty_state.dart';
 import 'ocr_photo_types.dart';
 
-/// Visor a pantalla completa de la imagen capturada, con acceso al texto OCR.
+/// Foto del ticket o del surtidor a pantalla completa, con el texto que leyó
+/// el OCR a mano para ver por qué no encontró un valor.
 class OcrFullScreenViewer extends StatelessWidget {
   final String imageUrl;
   final String? ocrText;
@@ -18,23 +25,21 @@ class OcrFullScreenViewer extends StatelessWidget {
     required this.type,
   });
 
+  bool get _isReceipt => type == OcrPhotoType.receipt;
+
   @override
   Widget build(BuildContext context) {
-    final isReceipt = type == OcrPhotoType.receipt;
-    final title = isReceipt ? 'Ticket' : 'Surtidor';
-
+    final c = context.colors;
+    final hasText = ocrText?.isNotEmpty ?? false;
     return Scaffold(
-      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(title),
+        title: Text(_isReceipt ? 'Ticket' : 'Surtidor'),
         actions: [
-          if (ocrText != null && ocrText!.isNotEmpty)
+          if (hasText)
             IconButton(
+              tooltip: 'Ver texto leído',
               onPressed: () => _showOcrText(context),
-              icon: const Icon(Icons.text_snippet),
-              tooltip: 'Ver texto OCR',
+              icon: const Icon(Icons.text_snippet_rounded),
             ),
         ],
       ),
@@ -44,37 +49,29 @@ class OcrFullScreenViewer extends StatelessWidget {
             Expanded(
               child: InteractiveViewer(
                 minScale: 0.5,
-                maxScale: 4.0,
+                maxScale: 4,
                 child: Center(
                   child: CachedNetworkImage(
                     imageUrl: imageUrl,
                     fit: BoxFit.contain,
-                    placeholder: (_, _) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                    errorWidget: (_, _, _) => const Icon(
-                      Icons.error,
-                      color: Colors.white,
-                      size: 48,
+                    placeholder: (_, _) =>
+                        const Center(child: CircularProgressIndicator()),
+                    errorWidget: (_, _, _) => const EmptyState(
+                      icon: Icons.broken_image_rounded,
+                      title: 'No se pudo cargar la foto',
                     ),
                   ),
                 ),
               ),
             ),
-            // Bottom hint
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              color: Colors.black.withValues(alpha: 0.8),
+            Padding(
+              padding: const EdgeInsets.all(Space.s4),
               child: Text(
-                isReceipt
-                    ? 'Pellizca para zoom. Busca el precio total en el ticket.'
-                    : 'Pellizca para zoom. Busca los litros y el importe en el display.',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
+                _isReceipt
+                    ? 'Pellizcá para hacer zoom. El total suele estar al pie del ticket.'
+                    : 'Pellizcá para hacer zoom. Los litros y el importe están en el visor.',
                 textAlign: TextAlign.center,
+                style: AppText.caption.copyWith(color: c.textMuted),
               ),
             ),
           ],
@@ -84,95 +81,48 @@ class OcrFullScreenViewer extends StatelessWidget {
   }
 
   void _showOcrText(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: AppTheme.border),
+    showAppSheet<void>(
+      context,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return AppSheet(
+          title: 'Texto leído',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SelectableText(
+                ocrText ?? '',
+                style: AppText.body.copyWith(
+                  color: c.text,
+                  fontFamily: AppFonts.mono,
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Texto detectado por OCR',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              const Gap(Space.s4),
+              Text(
+                _isReceipt
+                    ? 'Buscá palabras como "Total" o "Importe", o valores con "\$".'
+                    : 'Buscá los litros (por ejemplo "28,605") y el importe del visor.',
+                style: AppText.caption.copyWith(color: c.textMuted),
               ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                child: SelectableText(
-                  ocrText ?? 'No se detectó texto',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppTheme.border),
-                ),
-              ),
-              child: Text(
-                type == OcrPhotoType.receipt
-                    ? 'Busca palabras como "Total", "Importe" o valores con "\$"'
-                    : 'Busca los litros (ej. "28.605") y el importe total del display',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-/// Vista de preview de un PDF (factura) descargado desde su URL.
+/// Un PDF adjunto (factura) a pantalla completa.
 class OcrPdfPreviewPage extends StatelessWidget {
   final String url;
   final String? fileName;
+
   const OcrPdfPreviewPage({super.key, required this.url, this.fileName});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: Text(fileName ?? 'PDF'),
-        backgroundColor: AppTheme.surface,
-      ),
+      appBar: AppBar(title: Text(fileName ?? 'PDF')),
       body: PdfPreview(
         build: (format) async {
           final bytes = await PdfService.downloadPdfBytes(url);
@@ -183,6 +133,15 @@ class OcrPdfPreviewPage extends StatelessWidget {
         canChangePageFormat: false,
         canDebug: false,
         pdfFileName: fileName,
+        scrollViewDecoration: BoxDecoration(color: context.colors.bg),
+        onError: (_, _) => const Center(
+          child: EmptyState(
+            icon: Icons.picture_as_pdf_rounded,
+            title: 'No se pudo abrir el PDF',
+            message: 'Revisá la conexión y probá de nuevo.',
+            tone: Tone.danger,
+          ),
+        ),
       ),
     );
   }
