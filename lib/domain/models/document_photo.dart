@@ -1,7 +1,7 @@
 /// Tipos de documentos del vehículo
 enum DocumentType {
-  cedulaVerde(0, 'Cédula Verde'),
-  cedulaAzul(1, 'Cédula Azul'),
+  cedulaVerde(0, 'Cédula verde'),
+  cedulaAzul(1, 'Cédula azul'),
   titulo(2, 'Título'),
   vtv(3, 'VTV');
 

@@ -89,20 +89,4 @@ class AppTheme {
         inversePrimary: c.accent,
         surfaceTint: Colors.transparent,
       );
-
-  // Alias temporales de la paleta anterior (valores del tema oscuro) para los
-  // widgets que todavía no leen `context.colors`. Se eliminan al terminar la
-  // migración de pantallas.
-  static const Color background = Color(0xFF0A1628);
-  static const Color surface = Color(0xFF122035);
-  static const Color surfaceLight = Color(0xFF1A2D47);
-  static const Color accentPrimary = Color(0xFF75AADB);
-  static const Color accentDark = Color(0xFF4A8BC2);
-  static const Color success = Color(0xFF4CC38A);
-  static const Color warning = Color(0xFFF2B34C);
-  static const Color error = Color(0xFFFF7B6E);
-  static const Color textPrimary = Color(0xFFF0F4F8);
-  static const Color textSecondary = Color(0xFF9DB5CC);
-  static const Color border = Color(0xFF2A4060);
-  static const Color whatsapp = Color(0xFF25D366);
 }

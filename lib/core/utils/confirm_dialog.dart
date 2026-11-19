@@ -58,17 +58,3 @@ Future<bool> confirmDiscard(BuildContext context) async {
   );
   return discard ?? false;
 }
-
-/// Alias temporal mientras las pantallas migran a [confirmDestructive] (o al
-/// borrado diferido con "Deshacer" para lo reversible).
-Future<bool> confirmDelete(
-  BuildContext context, {
-  required String title,
-  required String message,
-  String confirmLabel = 'Eliminar',
-}) => confirmDestructive(
-  context,
-  title: title,
-  message: message,
-  confirmLabel: confirmLabel,
-);

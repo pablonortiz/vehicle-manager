@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:intl/intl.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+import '../../core/utils/formatters.dart';
+import '../../core/utils/plate_format.dart';
 import '../../domain/models/vehicle.dart';
 
 /// Días antes del vencimiento en los que se avisa.
@@ -138,13 +139,13 @@ class NotificationService {
     DateTime expiry,
     DateTime now,
   ) async {
-    final dateFormat = DateFormat('dd/MM/yyyy');
     try {
       for (final reminder in reminderSchedule(expiry, now)) {
         await _plugin.zonedSchedule(
           _notifId(vehicle.id!, type, reminder.index),
           '$label por vencer',
-          '${vehicle.displayName} (${vehicle.plate}): vence el ${dateFormat.format(expiry)}',
+          '${vehicle.displayName} (${formatPlate(vehicle.plate)}): vence el '
+              '${AppFormats.date(expiry)}',
           tz.TZDateTime.from(reminder.date, tz.local),
           const NotificationDetails(
             android: AndroidNotificationDetails(

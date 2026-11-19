@@ -664,7 +664,7 @@ class PdfService {
                   ),
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    'Puede accederlo en:',
+                    'Podés verlo en:',
                     style: const pw.TextStyle(
                       fontSize: 10,
                       color: _textSecondary,
@@ -748,7 +748,7 @@ class PdfService {
                   ),
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    'Puede accederla en:',
+                    'Podés verla en:',
                     style: const pw.TextStyle(
                       fontSize: 10,
                       color: _textSecondary,
@@ -1109,7 +1109,7 @@ class PdfService {
                         ),
                       ),
                       pw.Text(
-                        'Gestor de Vehiculos',
+                        'Gestor de Vehículos',
                         style: pw.TextStyle(
                           fontSize: 10,
                           fontWeight: pw.FontWeight.bold,
