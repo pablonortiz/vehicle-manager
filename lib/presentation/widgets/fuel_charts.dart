@@ -111,6 +111,7 @@ FlTitlesData _axisTitles(
   double leftReserved = 44,
 }) {
   final style = AppText.caption.tabular.copyWith(color: context.colors.textMuted);
+  final grow = _labelGrowth(context);
   const hidden = AxisTitles(sideTitles: SideTitles(showTitles: false));
   return FlTitlesData(
     topTitles: hidden,
@@ -119,9 +120,9 @@ FlTitlesData _axisTitles(
       sideTitles: SideTitles(
         showTitles: true,
         interval: scale.interval,
-        reservedSize: leftReserved,
+        reservedSize: leftReserved * grow,
         getTitlesWidget: (value, meta) => _isOnStep(value, scale)
-            ? Text(leftLabel(value), style: style)
+            ? Text(leftLabel(value), style: style, maxLines: 1, softWrap: false)
             : const SizedBox.shrink(),
       ),
     ),
@@ -129,14 +130,14 @@ FlTitlesData _axisTitles(
       sideTitles: SideTitles(
         showTitles: true,
         interval: 1,
-        reservedSize: 28,
+        reservedSize: 28 * grow,
         getTitlesWidget: (value, meta) {
           final label =
               value == value.roundToDouble() ? bottomLabel(value.toInt()) : null;
           if (label == null) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(top: Space.s2),
-            child: Text(label, style: style),
+            child: Text(label, style: style, maxLines: 1, softWrap: false),
           );
         },
       ),
@@ -147,6 +148,15 @@ FlTitlesData _axisTitles(
 /// Aire a los costados de las líneas: sin esto, la primera y la última
 /// etiqueta del eje quedan cortadas contra el borde.
 const _edgePad = 0.3;
+
+/// Cuánto crecen las etiquetas de eje con la letra del sistema, para que su
+/// lugar crezca igual (si no, con letra grande "$ 2.300" se corta). Se mide
+/// sobre el tamaño real de la etiqueta: el escalado de Android 14 no es
+/// lineal y `scale(44)` trataría 44 como un tamaño de letra.
+double _labelGrowth(BuildContext context) {
+  final size = AppText.caption.fontSize!;
+  return MediaQuery.textScalerOf(context).scale(size) / size;
+}
 
 bool _isOnStep(double value, ChartScale scale) {
   final steps = (value - scale.min) / scale.interval;

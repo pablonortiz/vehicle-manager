@@ -251,6 +251,11 @@ class _MonthlyChartCard extends StatelessWidget {
     // Hasta 6 meses rotulados, contados desde el último.
     final labelStep = (byMonth.length / 6).ceil();
     final labelStyle = AppText.caption.tabular.copyWith(color: c.textMuted);
+    // El lugar de las etiquetas crece con la letra del sistema (si no, con
+    // letra grande "$ 500 mil" se corta). Se mide sobre el tamaño real de la
+    // etiqueta: el escalado de Android 14 no es lineal.
+    final labelSize = labelStyle.fontSize!;
+    final grow = MediaQuery.textScalerOf(context).scale(labelSize) / labelSize;
     const hidden = AxisTitles(sideTitles: SideTitles(showTitles: false));
     return AppCard(
       child: Column(
@@ -297,14 +302,14 @@ class _MonthlyChartCard extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: scale.interval,
-                      reservedSize: 64,
+                      reservedSize: 64 * grow,
                       getTitlesWidget: (value, meta) {
                         final steps = (value - scale.min) / scale.interval;
                         if ((steps - steps.round()).abs() > 1e-6) {
                           return const SizedBox.shrink();
                         }
                         return Text(AppFormats.moneyCompact(value),
-                            style: labelStyle);
+                            style: labelStyle, maxLines: 1, softWrap: false);
                       },
                     ),
                   ),
@@ -312,7 +317,7 @@ class _MonthlyChartCard extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: 1,
-                      reservedSize: 28,
+                      reservedSize: 28 * grow,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
                         final labeled = value == value.roundToDouble() &&
@@ -323,7 +328,7 @@ class _MonthlyChartCard extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: Space.s2),
                           child: Text(_monthLabel(byMonth[index]),
-                              style: labelStyle),
+                              style: labelStyle, maxLines: 1, softWrap: false),
                         );
                       },
                     ),
