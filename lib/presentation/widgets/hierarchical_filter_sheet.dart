@@ -1,481 +1,296 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/constants/provinces.dart';
-import '../../domain/models/city.dart';
-import '../../domain/models/lugar.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
 import '../providers/location_provider.dart';
 import '../providers/vehicle_provider.dart';
+import 'app_card.dart';
+import 'app_notice.dart';
+import 'app_sheet.dart';
+import 'app_tag.dart';
+import 'app_text_field.dart';
 
-/// A bottom sheet widget for hierarchical location filtering.
-/// Province -> City -> Lugar
-class HierarchicalFilterSheet extends ConsumerStatefulWidget {
+/// Abre el filtro por ubicación (provincia → ciudad → lugar). El filtro se
+/// aplica al tocar cada opción; el pie dice cuántos vehículos quedan.
+Future<void> showHierarchicalFilterSheet(BuildContext context) {
+  return showAppSheet<void>(
+    context,
+    builder: (_) => const HierarchicalFilterSheet(),
+  );
+}
+
+/// Cada nivel elegido queda resumido en una fila con "Cambiar" y abre el
+/// siguiente: el sheet no crece con listas que ya se resolvieron.
+class HierarchicalFilterSheet extends ConsumerWidget {
   const HierarchicalFilterSheet({super.key});
 
   @override
-  ConsumerState<HierarchicalFilterSheet> createState() => _HierarchicalFilterSheetState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(locationFilterProvider);
+    final notifier = ref.read(locationFilterProvider.notifier);
+    final provinceId = filter.provinceId;
+    final cityId = filter.cityId;
+    final resultCount =
+        ref.watch(vehiclesByLocationFilterProvider).valueOrNull?.length;
+
+    return AppSheet(
+      title: 'Filtrar por ubicación',
+      footer: Row(
+        children: [
+          if (filter.hasFilter) ...[
+            TextButton(onPressed: notifier.clearAll, child: const Text('Limpiar')),
+            const Gap(Space.s3),
+          ],
+          Expanded(
+            child: SizedBox(
+              height: Sizes.controlH,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(_resultLabel(resultCount)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const FieldLabel('Provincia'),
+          const Gap(Space.s2),
+          provinceId == null
+              ? _ProvinceOptions(onSelected: notifier.setProvince)
+              : _ChosenRow(
+                  label: ArgentinaProvinces.getById(provinceId).name,
+                  onChange: () => notifier.setProvince(null),
+                ),
+          if (provinceId != null) ...[
+            const Gap(Space.s5),
+            const FieldLabel('Ciudad'),
+            const Gap(Space.s2),
+            cityId == null
+                ? _CityOptions(provinceId: provinceId, onSelected: notifier.setCity)
+                : _ChosenCity(cityId: cityId, onChange: notifier.clearCity),
+          ],
+          if (cityId != null) ...[
+            const Gap(Space.s5),
+            const FieldLabel('Lugar'),
+            const Gap(Space.s2),
+            filter.lugarId == null
+                ? _LugarOptions(cityId: cityId, onSelected: notifier.setLugar)
+                : _ChosenLugar(
+                    lugarId: filter.lugarId!, onChange: notifier.clearLugar),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _resultLabel(int? count) => switch (count) {
+        null => 'Listo',
+        1 => 'Ver 1 vehículo',
+        _ => 'Ver $count vehículos',
+      };
 }
 
-class _HierarchicalFilterSheetState extends ConsumerState<HierarchicalFilterSheet> {
+class _ProvinceOptions extends ConsumerWidget {
+  final ValueChanged<int> onSelected;
+
+  const _ProvinceOptions({required this.onSelected});
+
   @override
-  Widget build(BuildContext context) {
-    final locationFilter = ref.watch(locationFilterProvider);
-    final vehicleCountsAsync = ref.watch(vehicleCountByProvinceProvider);
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(vehicleCountByProvinceProvider).when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudieron cargar las provincias.',
+            onRetry: () => ref.invalidate(vehicleCountByProvinceProvider),
           ),
-          child: Column(
-            children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              // Title and clear button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filtrar por ubicación',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (locationFilter.hasFilter)
-                      TextButton(
-                        onPressed: () {
-                          ref.read(locationFilterProvider.notifier).clearAll();
-                        },
-                        child: const Text('Limpiar'),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Active filter chips
-              if (locationFilter.hasFilter)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _ActiveFilterChips(locationFilter: locationFilter),
-                ),
-
-              const Divider(),
-
-              // Filter content
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    // Province section
-                    _SectionHeader(
-                      title: 'Provincia',
-                      isSelected: locationFilter.provinceId != null,
-                      onClear: locationFilter.provinceId != null
-                          ? () => ref.read(locationFilterProvider.notifier).setProvince(null)
-                          : null,
-                    ),
-                    vehicleCountsAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (_, _) => const Text('Error cargando provincias'),
-                      data: (counts) => _ProvinceList(
-                        selectedProvinceId: locationFilter.provinceId,
-                        vehicleCounts: counts,
-                        onSelected: (provinceId) {
-                          ref.read(locationFilterProvider.notifier).setProvince(provinceId);
-                        },
-                      ),
-                    ),
-
-                    // City section (only shown if province is selected)
-                    if (locationFilter.provinceId != null) ...[
-                      const SizedBox(height: 16),
-                      _SectionHeader(
-                        title: 'Ciudad',
-                        isSelected: locationFilter.cityId != null,
-                        onClear: locationFilter.cityId != null
-                            ? () => ref.read(locationFilterProvider.notifier).clearCity()
-                            : null,
-                      ),
-                      _CityList(
-                        provinceId: locationFilter.provinceId!,
-                        selectedCityId: locationFilter.cityId,
-                        onSelected: (cityId) {
-                          ref.read(locationFilterProvider.notifier).setCity(cityId);
-                        },
-                      ),
-                    ],
-
-                    // Lugar section (only shown if city is selected)
-                    if (locationFilter.cityId != null) ...[
-                      const SizedBox(height: 16),
-                      _SectionHeader(
-                        title: 'Lugar',
-                        isSelected: locationFilter.lugarId != null,
-                        onClear: locationFilter.lugarId != null
-                            ? () => ref.read(locationFilterProvider.notifier).clearLugar()
-                            : null,
-                      ),
-                      _LugarList(
-                        cityId: locationFilter.cityId!,
-                        selectedLugarId: locationFilter.lugarId,
-                        onSelected: (lugarId) {
-                          ref.read(locationFilterProvider.notifier).setLugar(lugarId);
-                        },
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          data: (counts) {
+            final provinces = ArgentinaProvinces.all
+                .where((province) => counts.containsKey(province.id))
+                .toList();
+            if (provinces.isEmpty) {
+              return const _EmptyOptions('Todavía no hay vehículos cargados.');
+            }
+            return AppCard.list(
+              children: [
+                for (final province in provinces)
+                  _OptionRow(
+                    label: province.name,
+                    count: counts[province.id] ?? 0,
+                    onTap: () => onSelected(province.id),
+                  ),
+              ],
+            );
+          },
         );
-      },
-    );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final bool isSelected;
-  final VoidCallback? onClear;
+class _CityOptions extends ConsumerWidget {
+  final int provinceId;
+  final ValueChanged<String> onSelected;
 
-  const _SectionHeader({
-    required this.title,
-    required this.isSelected,
-    this.onClear,
-  });
+  const _CityOptions({required this.provinceId, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final counts =
+        ref.watch(vehicleCountByCityProvider(provinceId)).valueOrNull ?? {};
+    return ref.watch(citiesByProvinceProvider(provinceId)).when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudieron cargar las ciudades.',
+            onRetry: () => ref.invalidate(citiesByProvinceProvider(provinceId)),
+          ),
+          data: (cities) => cities.isEmpty
+              ? const _EmptyOptions('Esta provincia no tiene ciudades cargadas.')
+              : AppCard.list(
+                  children: [
+                    for (final city in cities)
+                      _OptionRow(
+                        label: city.name,
+                        count: counts[city.id] ?? 0,
+                        onTap: () => onSelected(city.id!),
+                      ),
+                  ],
+                ),
+        );
+  }
+}
+
+class _LugarOptions extends ConsumerWidget {
+  final String cityId;
+  final ValueChanged<String> onSelected;
+
+  const _LugarOptions({required this.cityId, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final counts = ref.watch(vehicleCountByLugarProvider(cityId)).valueOrNull ?? {};
+    return ref.watch(lugaresByCityProvider(cityId)).when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudieron cargar los lugares.',
+            onRetry: () => ref.invalidate(lugaresByCityProvider(cityId)),
+          ),
+          data: (lugares) => lugares.isEmpty
+              ? const _EmptyOptions('Esta ciudad no tiene lugares cargados.')
+              : AppCard.list(
+                  children: [
+                    for (final lugar in lugares)
+                      _OptionRow(
+                        label: lugar.name,
+                        count: counts[lugar.id] ?? 0,
+                        onTap: () => onSelected(lugar.id!),
+                      ),
+                  ],
+                ),
+        );
+  }
+}
+
+class _ChosenCity extends ConsumerWidget {
+  final String cityId;
+  final VoidCallback onChange;
+
+  const _ChosenCity({required this.cityId, required this.onChange});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final city = ref.watch(cityByIdProvider(cityId)).valueOrNull;
+    return _ChosenRow(label: city?.name ?? '…', onChange: onChange);
+  }
+}
+
+class _ChosenLugar extends ConsumerWidget {
+  final String lugarId;
+  final VoidCallback onChange;
+
+  const _ChosenLugar({required this.lugarId, required this.onChange});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lugar = ref.watch(lugarByIdProvider(lugarId)).valueOrNull;
+    return _ChosenRow(label: lugar?.name ?? '…', onChange: onChange);
+  }
+}
+
+/// Opción de un nivel: nombre y cuántos vehículos tiene.
+class _OptionRow extends StatelessWidget {
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+
+  const _OptionRow({required this.label, required this.count, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface,
-            ),
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: Sizes.touchMin + Space.s1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: Space.s4, vertical: Space.s3),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(label, style: AppText.body.copyWith(color: c.text)),
+              ),
+              if (count > 0) CountBadge(count),
+              const Gap(Space.s2),
+              Icon(Icons.chevron_right_rounded,
+                  size: Sizes.iconMd, color: c.textMuted),
+            ],
           ),
-          if (onClear != null)
-            IconButton(
-              icon: const Icon(Icons.clear, size: 18),
-              onPressed: onClear,
-              tooltip: 'Limpiar $title',
-            ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ActiveFilterChips extends ConsumerWidget {
-  final LocationFilter locationFilter;
+/// Nivel ya elegido: queda a la vista con "Cambiar" para volver a la lista.
+class _ChosenRow extends StatelessWidget {
+  final String label;
+  final VoidCallback onChange;
 
-  const _ActiveFilterChips({required this.locationFilter});
+  const _ChosenRow({required this.label, required this.onChange});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard.list(
       children: [
-        if (locationFilter.provinceId != null)
-          Chip(
-            label: Text(ArgentinaProvinces.getById(locationFilter.provinceId!).name),
-            deleteIcon: const Icon(Icons.close, size: 16),
-            onDeleted: () => ref.read(locationFilterProvider.notifier).setProvince(null),
+        Padding(
+          padding: const EdgeInsets.only(left: Space.s4, right: Space.s2),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, size: Sizes.iconMd, color: c.accent),
+              const Gap(Space.s3),
+              Expanded(
+                child: Text(label, style: AppText.label.copyWith(color: c.text)),
+              ),
+              TextButton(onPressed: onChange, child: const Text('Cambiar')),
+            ],
           ),
-        if (locationFilter.cityId != null)
-          Consumer(
-            builder: (context, ref, _) {
-              final cityAsync = ref.watch(cityByIdProvider(locationFilter.cityId!));
-              return cityAsync.when(
-                loading: () => const Chip(label: Text('...')),
-                error: (_, _) => const SizedBox.shrink(),
-                data: (city) => city != null
-                    ? Chip(
-                        label: Text(city.name),
-                        deleteIcon: const Icon(Icons.close, size: 16),
-                        onDeleted: () => ref.read(locationFilterProvider.notifier).clearCity(),
-                      )
-                    : const SizedBox.shrink(),
-              );
-            },
-          ),
-        if (locationFilter.lugarId != null)
-          Consumer(
-            builder: (context, ref, _) {
-              final lugarAsync = ref.watch(lugarByIdProvider(locationFilter.lugarId!));
-              return lugarAsync.when(
-                loading: () => const Chip(label: Text('...')),
-                error: (_, _) => const SizedBox.shrink(),
-                data: (lugar) => lugar != null
-                    ? Chip(
-                        label: Text(lugar.name),
-                        deleteIcon: const Icon(Icons.close, size: 16),
-                        onDeleted: () => ref.read(locationFilterProvider.notifier).clearLugar(),
-                      )
-                    : const SizedBox.shrink(),
-              );
-            },
-          ),
+        ),
       ],
     );
   }
 }
 
-class _ProvinceList extends StatelessWidget {
-  final int? selectedProvinceId;
-  final Map<int, int> vehicleCounts;
-  final void Function(int) onSelected;
+class _EmptyOptions extends StatelessWidget {
+  final String text;
 
-  const _ProvinceList({
-    required this.selectedProvinceId,
-    required this.vehicleCounts,
-    required this.onSelected,
-  });
+  const _EmptyOptions(this.text);
 
   @override
   Widget build(BuildContext context) {
-    // Only show provinces that have vehicles
-    final provincesWithVehicles = ArgentinaProvinces.all
-        .where((p) => vehicleCounts.containsKey(p.id))
-        .toList();
-
-    if (provincesWithVehicles.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text('No hay vehiculos registrados'),
-      );
-    }
-
-    return Column(
-      children: provincesWithVehicles.map((province) {
-        final count = vehicleCounts[province.id] ?? 0;
-        final isSelected = selectedProvinceId == province.id;
-
-        return ListTile(
-          dense: true,
-          selected: isSelected,
-          leading: Icon(
-            isSelected ? Icons.check_circle : Icons.circle_outlined,
-            color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          ),
-          title: Text(province.name),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              count.toString(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-          ),
-          onTap: () => onSelected(province.id),
-        );
-      }).toList(),
-    );
+    return Text(text, style: AppText.body.copyWith(color: context.colors.textMuted));
   }
-}
-
-class _CityList extends ConsumerWidget {
-  final int provinceId;
-  final String? selectedCityId;
-  final void Function(String) onSelected;
-
-  const _CityList({
-    required this.provinceId,
-    required this.selectedCityId,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final citiesAsync = ref.watch(citiesByProvinceProvider(provinceId));
-    final countsAsync = ref.watch(vehicleCountByCityProvider(provinceId));
-
-    return citiesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => const Text('Error cargando ciudades'),
-      data: (cities) {
-        if (cities.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('No hay ciudades registradas en esta provincia'),
-          );
-        }
-
-        return countsAsync.when(
-          loading: () => _buildCityList(context, cities, {}, selectedCityId, onSelected),
-          error: (_, _) => _buildCityList(context, cities, {}, selectedCityId, onSelected),
-          data: (counts) => _buildCityList(context, cities, counts, selectedCityId, onSelected),
-        );
-      },
-    );
-  }
-
-  Widget _buildCityList(
-    BuildContext context,
-    List<City> cities,
-    Map<String, int> counts,
-    String? selectedCityId,
-    void Function(String) onSelected,
-  ) {
-    return Column(
-      children: cities.map((city) {
-        final count = counts[city.id] ?? 0;
-        final isSelected = selectedCityId == city.id;
-
-        return ListTile(
-          dense: true,
-          selected: isSelected,
-          leading: Icon(
-            isSelected ? Icons.check_circle : Icons.circle_outlined,
-            color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          ),
-          title: Text(city.name),
-          trailing: count > 0
-              ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    count.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                )
-              : null,
-          onTap: () => onSelected(city.id!),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _LugarList extends ConsumerWidget {
-  final String cityId;
-  final String? selectedLugarId;
-  final void Function(String) onSelected;
-
-  const _LugarList({
-    required this.cityId,
-    required this.selectedLugarId,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lugaresAsync = ref.watch(lugaresByCityProvider(cityId));
-    final countsAsync = ref.watch(vehicleCountByLugarProvider(cityId));
-
-    return lugaresAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => const Text('Error cargando lugares'),
-      data: (lugares) {
-        if (lugares.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('No hay lugares registrados en esta ciudad'),
-          );
-        }
-
-        return countsAsync.when(
-          loading: () => _buildLugarList(context, lugares, {}, selectedLugarId, onSelected),
-          error: (_, _) => _buildLugarList(context, lugares, {}, selectedLugarId, onSelected),
-          data: (counts) => _buildLugarList(context, lugares, counts, selectedLugarId, onSelected),
-        );
-      },
-    );
-  }
-
-  Widget _buildLugarList(
-    BuildContext context,
-    List<Lugar> lugares,
-    Map<String, int> counts,
-    String? selectedLugarId,
-    void Function(String) onSelected,
-  ) {
-    return Column(
-      children: lugares.map((lugar) {
-        final count = counts[lugar.id] ?? 0;
-        final isSelected = selectedLugarId == lugar.id;
-
-        return ListTile(
-          dense: true,
-          selected: isSelected,
-          leading: Icon(
-            isSelected ? Icons.check_circle : Icons.circle_outlined,
-            color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          ),
-          title: Text(lugar.name),
-          trailing: count > 0
-              ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    count.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onTertiaryContainer,
-                    ),
-                  ),
-                )
-              : null,
-          onTap: () => onSelected(lugar.id!),
-        );
-      }).toList(),
-    );
-  }
-}
-
-/// Helper function to show the hierarchical filter sheet
-Future<void> showHierarchicalFilterSheet(BuildContext context) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    // Sobre el navigator raíz: si no, el FAB del shell queda flotando
-    // por encima del sheet.
-    useRootNavigator: true,
-    builder: (context) => const HierarchicalFilterSheet(),
-  );
 }

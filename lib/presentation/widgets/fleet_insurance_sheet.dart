@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../../core/theme/app_theme.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/fleet_insurance.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
-import 'date_picker_field.dart';
-import 'sheet_notice.dart';
+import 'app_date_field.dart';
+import 'app_notice.dart';
+import 'app_sheet.dart';
+import 'app_snack.dart';
+import 'app_text_field.dart';
+import 'status_styles.dart';
+import 'vehicle_list_tile.dart';
 
 /// Abre el sheet para asignar un mismo seguro (compañía + vencimiento) a los
 /// vehículos que queden tildados y, si el usuario confirma, aplica los cambios
@@ -18,18 +27,13 @@ Future<void> showFleetInsuranceSheet(
   final vehicles = await ref.read(vehiclesProvider.future);
   if (!context.mounted) return;
   if (vehicles.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No hay vehículos cargados')),
-    );
+    AppSnack.info(context, 'Todavía no hay vehículos cargados');
     return;
   }
 
-  final request = await showModalBottomSheet<_InsuranceRequest>(
-    context: context,
-    isScrollControlled: true,
-    // Sobre el navigator raíz para tapar el FAB y la bottom bar del shell.
-    useRootNavigator: true,
-    backgroundColor: Colors.transparent,
+  final request = await showAppSheet<_InsuranceRequest>(
+    context,
+    enableDrag: false,
     builder: (_) => _FleetInsuranceSheet(vehicles: _sortedByName(vehicles)),
   );
   if (request == null || !context.mounted) return;
@@ -50,10 +54,7 @@ Future<void> _applyInsurance(
   final updates = request.assignment.applyTo(request.vehicles);
   final skipped = request.vehicles.length - updates.length;
   if (updates.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Los vehículos seleccionados ya tienen ese seguro')),
-    );
+    AppSnack.info(context, 'Los vehículos elegidos ya tienen ese seguro');
     return;
   }
 
@@ -66,16 +67,16 @@ Future<void> _applyInsurance(
   if (!context.mounted) return;
 
   Navigator.of(context, rootNavigator: true).pop();
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(_resultMessage(
-        updated: updates.length - failed,
-        skipped: skipped,
-        failed: failed,
-      )),
-      backgroundColor: failed == 0 ? AppTheme.success : AppTheme.warning,
-    ),
+  final message = _resultMessage(
+    updated: updates.length - failed,
+    skipped: skipped,
+    failed: failed,
   );
+  if (failed == 0) {
+    AppSnack.success(context, message);
+  } else {
+    AppSnack.error(context, message);
+  }
 }
 
 String _resultMessage(
@@ -95,33 +96,36 @@ String _resultMessage(
 
 void _showProgressDialog(BuildContext context,
     {required int total, required ValueNotifier<int> progress}) {
-  showDialog(
+  showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: ValueListenableBuilder<int>(
-        valueListenable: progress,
-        builder: (_, done, _) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LinearProgressIndicator(
-              value: done / total,
-              borderRadius: BorderRadius.circular(4),
+    useRootNavigator: true,
+    builder: (dialogContext) {
+      final c = dialogContext.colors;
+      return PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: ValueListenableBuilder<int>(
+            valueListenable: progress,
+            builder: (_, done, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Actualizando el seguro…',
+                    style: AppText.titleSm.copyWith(color: c.text)),
+                const Gap(Space.s4),
+                LinearProgressIndicator(value: done / total),
+                const Gap(Space.s2),
+                Text(
+                  '$done de $total vehículos',
+                  style: AppText.caption.tabular.copyWith(color: c.textMuted),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            const Text('Actualizando seguro...',
-                style: TextStyle(color: AppTheme.textPrimary)),
-            const SizedBox(height: 8),
-            Text(
-              '$done de $total vehículos',
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.textSecondary),
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -192,167 +196,114 @@ class _FleetInsuranceSheetState extends State<_FleetInsuranceSheet> {
     Navigator.pop(context, _InsuranceRequest(assignment, selectedInOrder));
   }
 
+  /// Hay algo cargado que se perdería al cerrar.
+  bool get _isDirty =>
+      _expiry != null ||
+      _companyController.text.trim() != (_knownCompanies.firstOrNull ?? '') ||
+      !_allSelected;
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final assignment = _assignment;
-    final canSave = assignment != null && _selected.isNotEmpty;
-
-    // El padding inferior acompaña al teclado para que el campo de compañía
-    // no quede tapado mientras se escribe.
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Seguro de la flota',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'La compañía y el vencimiento se asignan a los vehículos '
-                        'tildados. Los destildados conservan su seguro.',
-                        style: TextStyle(
-                            fontSize: 13, color: AppTheme.textSecondary),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _companyController,
-                        textCapitalization: TextCapitalization.words,
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Compañía de seguro',
-                          hintText: 'Dejá vacío para no cambiarla',
-                          prefixIcon: Icon(Icons.security),
-                        ),
-                      ),
-                      if (_knownCompanies.length > 1) ...[
-                        const SizedBox(height: 8),
-                        _CompanySuggestions(
-                          companies: _knownCompanies
-                              .take(_maxSuggestedCompanies)
-                              .toList(),
-                          current: _companyController.text.trim(),
-                          onSelected: (company) => setState(
-                              () => _companyController.text = company),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      DatePickerField(
-                        label: 'Vencimiento del seguro',
-                        value: _expiry,
-                        onChanged: (date) => setState(() => _expiry = date),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Text(
-                            'Vehículos',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${_selected.length} de ${widget.vehicles.length}',
-                            style: const TextStyle(
-                                fontSize: 13, color: AppTheme.textSecondary),
-                          ),
-                          TextButton(
-                            onPressed: _toggleAll,
-                            child: Text(_allSelected ? 'Ninguno' : 'Todos'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: widget.vehicles.length,
-                    itemBuilder: (context, index) {
-                      final vehicle = widget.vehicles[index];
-                      return _VehicleCheckTile(
-                        vehicle: vehicle,
-                        selected: _selected.contains(vehicle),
-                        onToggle: () => _toggle(vehicle),
-                      );
-                    },
-                  ),
-                ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                  child: Column(
-                    children: [
-                      _assignmentNotice(assignment),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: canSave ? _confirm : null,
-                          icon: const Icon(Icons.check),
-                          label: const Text('Guardar seguro'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    final count = _selected.length;
+    final canSave = assignment != null && count > 0;
+    return AppSheet(
+      title: 'Seguro de la flota',
+      hasUnsavedChanges: _isDirty,
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _assignmentNotice(assignment),
+          const Gap(Space.s3),
+          SizedBox(
+            height: Sizes.controlH,
+            child: FilledButton(
+              onPressed: canSave ? _confirm : null,
+              child: Text(count == 1 || !canSave
+                  ? 'Guardar seguro'
+                  : 'Guardar seguro en $count vehículos'),
             ),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'La compañía y el vencimiento se asignan a los vehículos tildados. '
+            'Los destildados conservan su seguro.',
+            style: AppText.body.copyWith(color: c.textMuted),
+          ),
+          const Gap(Space.s4),
+          AppTextField(
+            label: 'Compañía de seguro',
+            controller: _companyController,
+            hint: 'Vacío: no se cambia',
+            icon: Icons.shield_rounded,
+            textCapitalization: TextCapitalization.words,
+            onChanged: (_) => setState(() {}),
+          ),
+          if (_knownCompanies.length > 1) ...[
+            const Gap(Space.s2),
+            _CompanySuggestions(
+              companies: _knownCompanies.take(_maxSuggestedCompanies).toList(),
+              current: _companyController.text.trim(),
+              onSelected: (company) =>
+                  setState(() => _companyController.text = company),
+            ),
+          ],
+          const Gap(Space.s4),
+          AppDateField(
+            label: 'Vencimiento del seguro',
+            required: true,
+            value: _expiry,
+            onChanged: (date) => setState(() => _expiry = date),
+          ),
+          const Gap(Space.s5),
+          Row(
+            children: [
+              const Expanded(child: FieldLabel('Vehículos')),
+              Text(
+                '$count de ${widget.vehicles.length}',
+                style: AppText.caption.tabular.copyWith(color: c.textMuted),
+              ),
+              TextButton(
+                onPressed: _toggleAll,
+                child: Text(_allSelected ? 'Ninguno' : 'Todos'),
+              ),
+            ],
+          ),
+          for (final vehicle in widget.vehicles)
+            _VehicleCheckTile(
+              vehicle: vehicle,
+              selected: _selected.contains(vehicle),
+              onToggle: () => _toggle(vehicle),
+            ),
+        ],
       ),
     );
   }
 
   Widget _assignmentNotice(InsuranceAssignment? assignment) {
     if (assignment == null) {
-      return const SheetNotice(
-        icon: Icons.event_outlined,
+      return const AppNotice(
+        icon: Icons.event_rounded,
         message: 'Elegí la fecha de vencimiento para continuar',
       );
     }
     final count = _selected.length;
     if (count == 0) {
-      return const SheetNotice(
-        icon: Icons.info_outline,
-        message: 'No hay vehículos seleccionados',
-        isWarning: true,
+      return const AppNotice(
+        tone: Tone.warning,
+        icon: Icons.info_rounded,
+        message: 'No hay vehículos tildados',
       );
     }
     final target = count == 1 ? '1 vehículo' : '$count vehículos';
-    return SheetNotice(
-      icon: Icons.security,
+    return AppNotice(
+      icon: Icons.shield_rounded,
       message: assignment.changesCompany
           ? 'Se va a asignar "${assignment.label}" a $target'
           : 'Se va a actualizar el ${assignment.label} en $target. '
@@ -376,25 +327,22 @@ class _CompanySuggestions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 6,
+      spacing: Space.s2,
+      runSpacing: Space.s2,
       children: [
         for (final company in companies)
-          ActionChip(
-            label: Text(company, style: const TextStyle(fontSize: 12)),
-            visualDensity: VisualDensity.compact,
-            side: BorderSide(
-              color: company == current
-                  ? AppTheme.accentPrimary
-                  : AppTheme.border,
-            ),
-            onPressed: () => onSelected(company),
+          ChoiceChip(
+            label: Text(company),
+            selected: company == current,
+            onSelected: (_) => onSelected(company),
           ),
       ],
     );
   }
 }
 
+/// La fila de vehículo de siempre con un checkbox a la derecha y, al pie, el
+/// seguro que tiene hoy. Toda la fila tilda y destilda.
 class _VehicleCheckTile extends StatelessWidget {
   final Vehicle vehicle;
   final bool selected;
@@ -406,9 +354,7 @@ class _VehicleCheckTile extends StatelessWidget {
     required this.onToggle,
   });
 
-  static final _dateFormat = DateFormat('dd/MM/yyyy');
-
-  /// "Nación Seguros · vence 28/09/2026" / "Sin seguro cargado".
+  /// "Nación Seguros · vence el 28 sept 2026" / "Sin seguro cargado".
   String get _currentInsurance {
     final company = vehicle.insuranceCompany?.trim() ?? '';
     final expiry = vehicle.insuranceExpiry;
@@ -416,55 +362,28 @@ class _VehicleCheckTile extends StatelessWidget {
     return [
       if (company.isNotEmpty) company,
       if (expiry != null)
-        '${vehicle.isInsuranceExpired ? 'venció' : 'vence'} '
-            '${_dateFormat.format(expiry)}',
+        '${vehicle.isInsuranceExpired ? 'venció el' : 'vence el'} '
+            '${AppFormats.date(expiry)}',
     ].join(' · ');
-  }
-
-  Color get _currentInsuranceColor {
-    if (vehicle.isInsuranceExpired) return AppTheme.error;
-    if (vehicle.isInsuranceExpiringSoon) return AppTheme.warning;
-    return AppTheme.textSecondary;
   }
 
   @override
   Widget build(BuildContext context) {
-    return CheckboxListTile(
-      value: selected,
-      onChanged: (_) => onToggle(),
-      controlAffinity: ListTileControlAffinity.leading,
-      activeColor: AppTheme.accentPrimary,
-      checkColor: AppTheme.background,
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              vehicle.displayName,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: selected ? AppTheme.textPrimary : AppTheme.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            vehicle.plate,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.accentPrimary,
-              letterSpacing: 1,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        _currentInsurance,
-        style: TextStyle(fontSize: 12, color: _currentInsuranceColor),
+    final c = context.colors;
+    final status = vehicle.insuranceStatus;
+    final insuranceColor =
+        status.needsAttention ? status.tone.foreground(c) : c.textMuted;
+    return MergeSemantics(
+      child: VehicleListTile(
+        vehicle: vehicle,
+        contentPadding: VehicleListTile.inSheetPadding,
+        showExpiryAlert: false,
+        onTap: onToggle,
+        trailing: Checkbox(value: selected, onChanged: (_) => onToggle()),
+        footer: Text(
+          _currentInsurance,
+          style: AppText.caption.copyWith(color: insuranceColor),
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-import 'package:intl/intl.dart';
+import '../core/utils/formatters.dart';
 import 'models/vehicle.dart';
 
 /// Seguro a asignar en bloque a varios vehículos. Con [company] vacía cada
@@ -11,14 +11,12 @@ class InsuranceAssignment {
       : company = _blankToNull(company),
         expiry = DateTime(expiry.year, expiry.month, expiry.day);
 
-  static final _dateFormat = DateFormat('dd/MM/yyyy');
-
   bool get changesCompany => company != null;
 
-  /// "Nación Seguros · vence 28/09/2027" o "vence 28/09/2027".
+  /// "Nación Seguros · vence el 28 sept 2027" o "vence el 28 sept 2027".
   String get label => [
         if (company != null) company!,
-        'vence ${_dateFormat.format(expiry)}',
+        'vence el ${AppFormats.date(expiry)}',
       ].join(' · ');
 
   /// Copias de [vehicles] con el seguro aplicado, sin los que ya lo tienen

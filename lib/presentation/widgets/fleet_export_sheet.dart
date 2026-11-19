@@ -2,29 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
+import '../../core/theme/app_typography.dart';
 import '../../data/services/fleet_report_pdf.dart';
 import '../../domain/fleet_summary.dart';
 import '../../domain/models/vehicle.dart';
 import '../providers/location_provider.dart';
 import '../providers/vehicle_provider.dart';
+import 'app_filter_chip.dart';
+import 'app_notice.dart';
+import 'app_sheet.dart';
+import 'app_text_field.dart';
 import 'location_filter_label.dart';
 import 'pdf_export_flow.dart';
-import 'sheet_notice.dart';
-import 'status_filter_chip.dart';
 
 /// Abre el sheet de exportación del listado y, si el usuario confirma, genera
 /// y comparte el PDF desde el [context] de la pantalla (el sheet ya se cerró).
 Future<void> showFleetExportSheet(BuildContext context) async {
-  final request = await showModalBottomSheet<_FleetExportRequest>(
-    context: context,
-    backgroundColor: AppTheme.surface,
-    isScrollControlled: true,
-    // Sobre el navigator raíz para tapar el FAB del shell.
-    useRootNavigator: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+  final request = await showAppSheet<_FleetExportRequest>(
+    context,
     builder: (_) => const _FleetExportSheet(),
   );
   if (request == null || !context.mounted) return;
@@ -66,6 +64,7 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final locationFilter = ref.watch(locationFilterProvider);
     final allVehicles =
         ref.watch(vehicleNotifierProvider).valueOrNull ?? const <Vehicle>[];
@@ -79,112 +78,86 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
     final selectedCount =
         _status == null ? scopeVehicles.length : (counts[_status] ?? 0);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    return AppSheet(
+      title: 'Exportar listado',
+      footer: SizedBox(
+        width: double.infinity,
+        height: Sizes.controlH,
+        child: FilledButton.icon(
+          onPressed: selectedCount == 0
+              ? null
+              : () => _confirm(scopeVehicles, locationFilter),
+          icon: const Icon(Icons.picture_as_pdf_rounded),
+          label: const Text('Generar PDF'),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'PDF con el detalle de cada vehículo, ordenado por provincia.',
+            style: AppText.body.copyWith(color: c.textMuted),
+          ),
+          const Gap(Space.s5),
+          const FieldLabel('Estado'),
+          const Gap(Space.s2),
+          Wrap(
+            spacing: Space.s2,
+            runSpacing: Space.s2,
+            children: [
+              AppFilterChip(
+                label: 'Todos',
+                count: scopeVehicles.length,
+                selected: _status == null,
+                onTap: () => setState(() => _status = null),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Exportar listado',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'PDF con el detalle de cada vehículo, ordenado por provincia.',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            const _SectionLabel('Estado'),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                StatusFilterChip(
-                  label: 'Todos',
-                  count: scopeVehicles.length,
-                  isSelected: _status == null,
-                  onTap: () => setState(() => _status = null),
+              for (final status in VehicleStatus.values)
+                AppFilterChip(
+                  label: status.label,
+                  count: counts[status] ?? 0,
+                  selected: _status == status,
+                  onTap: () => setState(() => _status = status),
                 ),
-                for (final status in VehicleStatus.values)
-                  StatusFilterChip(
-                    label: status.label,
-                    color: status.color,
-                    count: counts[status] ?? 0,
-                    isSelected: _status == status,
-                    onTap: () => setState(() => _status = status),
-                  ),
-              ],
-            ),
-            if (locationFilter.hasFilter) ...[
-              const SizedBox(height: 20),
-              const _SectionLabel('Alcance'),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ScopeOption(
-                      isSelected: !_onlyFilteredLocation,
-                      onTap: () =>
-                          setState(() => _onlyFilteredLocation = false),
-                      child: Text(
-                        'Toda la flota',
-                        textAlign: TextAlign.center,
-                        style: _optionStyle(!_onlyFilteredLocation),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ScopeOption(
-                      isSelected: _onlyFilteredLocation,
-                      onTap: () =>
-                          setState(() => _onlyFilteredLocation = true),
-                      child: LocationFilterLabel(
-                        locationFilter: locationFilter,
-                        prefix: 'Solo ',
-                        textAlign: TextAlign.center,
-                        style: _optionStyle(_onlyFilteredLocation),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
-            const SizedBox(height: 20),
-            SheetNotice(
-              icon: selectedCount == 0
-                  ? Icons.info_outline
-                  : Icons.description_outlined,
-              message: _previewMessage(selectedCount),
-              isWarning: selectedCount == 0,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: selectedCount == 0
-                    ? null
-                    : () => _confirm(scopeVehicles, locationFilter),
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('Generar PDF'),
-              ),
+          ),
+          if (locationFilter.hasFilter) ...[
+            const Gap(Space.s5),
+            const FieldLabel('Alcance'),
+            const Gap(Space.s2),
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: [
+                const ButtonSegment(
+                  value: false,
+                  label: Text('Toda la flota'),
+                ),
+                ButtonSegment(
+                  value: true,
+                  // Hereda el estilo del segmento (seleccionado o no).
+                  label: Builder(
+                    builder: (context) => LocationFilterLabel(
+                      locationFilter: locationFilter,
+                      prefix: 'Solo ',
+                      textAlign: TextAlign.center,
+                      style: DefaultTextStyle.of(context).style,
+                    ),
+                  ),
+                ),
+              ],
+              selected: {_onlyFilteredLocation},
+              onSelectionChanged: (selection) =>
+                  setState(() => _onlyFilteredLocation = selection.first),
             ),
           ],
-        ),
+          const Gap(Space.s5),
+          AppNotice(
+            tone: selectedCount == 0 ? Tone.warning : Tone.info,
+            icon: selectedCount == 0
+                ? Icons.info_rounded
+                : Icons.description_rounded,
+            message: _previewMessage(selectedCount),
+          ),
+        ],
       ),
     );
   }
@@ -196,12 +169,6 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
         ? 'Se va a exportar 1 vehículo'
         : 'Se van a exportar $count vehículos';
   }
-
-  TextStyle _optionStyle(bool isSelected) => TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: isSelected ? AppTheme.accentPrimary : AppTheme.textSecondary,
-      );
 
   Future<void> _confirm(
       List<Vehicle> scopeVehicles, LocationFilter locationFilter) async {
@@ -241,54 +208,5 @@ class _FleetExportSheetState extends ConsumerState<_FleetExportSheet> {
       if (lugar != null) parts.add(lugar.name);
     }
     return parts.join(' > ');
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
-        ),
-      );
-}
-
-class _ScopeOption extends StatelessWidget {
-  final Widget child;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ScopeOption({
-    required this.child,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.accentPrimary.withValues(alpha: 0.2)
-              : AppTheme.surfaceLight,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? AppTheme.accentPrimary : AppTheme.border,
-          ),
-        ),
-        child: child,
-      ),
-    );
   }
 }

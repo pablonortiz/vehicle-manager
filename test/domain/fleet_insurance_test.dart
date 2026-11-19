@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:gestor_vehiculos/core/constants/vehicle_constants.dart';
 import 'package:gestor_vehiculos/domain/fleet_insurance.dart';
 import 'package:gestor_vehiculos/domain/models/vehicle.dart';
@@ -24,6 +25,8 @@ Vehicle _vehicle(String plate, {String? company, DateTime? expiry}) => Vehicle(
     );
 
 void main() {
+  setUpAll(() => initializeDateFormatting('es_AR'));
+
   final renewal = DateTime(2027, 9, 28);
 
   group('InsuranceAssignment', () {
@@ -43,9 +46,9 @@ void main() {
     test('label con y sin compañía', () {
       expect(
         InsuranceAssignment(company: 'Nación Seguros', expiry: renewal).label,
-        'Nación Seguros · vence 28/09/2027',
+        'Nación Seguros · vence el 28 sept 2027',
       );
-      expect(InsuranceAssignment(expiry: renewal).label, 'vence 28/09/2027');
+      expect(InsuranceAssignment(expiry: renewal).label, 'vence el 28 sept 2027');
     });
 
     test('applyTo asigna compañía y vencimiento y omite los que ya lo tienen',
