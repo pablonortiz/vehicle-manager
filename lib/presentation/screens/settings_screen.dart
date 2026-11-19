@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/config/supabase_config.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_typography.dart';
 import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../widgets/fleet_insurance_sheet.dart';
+import '../widgets/theme_mode_selector.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -248,6 +251,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ],
+          const SizedBox(height: 32),
+
+          Text(
+            'Apariencia',
+            style: AppText.titleSm.copyWith(color: context.colors.accent),
+          ),
+          const SizedBox(height: 12),
+          const ThemeModeSelector(),
           const SizedBox(height: 32),
 
           // Sección Info
