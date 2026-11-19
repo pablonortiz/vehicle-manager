@@ -54,6 +54,9 @@ class AppFormats {
   /// Fecha de lectura: "12 dic 2026" (en un campo en edición va dd/MM/yyyy).
   static String date(DateTime value) => _stripDots(_date.format(value));
 
+  /// "14:30".
+  static String time(DateTime value) => _time.format(value);
+
   /// "12 dic, 14:30"; con el año si no es el actual: "12 dic 2025, 14:30".
   static String dateTime(DateTime value, {DateTime? now}) {
     final day = value.year == (now ?? DateTime.now()).year

@@ -87,7 +87,7 @@ class VehicleHistory {
   String get fieldLabel {
     switch (field) {
       case 'created':
-        return 'Creación';
+        return 'Alta del vehículo';
       case 'plate':
         return 'Patente';
       case 'type':
@@ -103,11 +103,11 @@ class VehicleHistory {
       case 'km':
         return 'Kilometraje';
       case 'vtvExpiry':
-        return 'Vencimiento VTV';
+        return 'Vencimiento de la VTV';
       case 'insuranceCompany':
         return 'Compañía de seguro';
       case 'insuranceExpiry':
-        return 'Vencimiento seguro';
+        return 'Vencimiento del seguro';
       case 'fuelType':
         return 'Combustible';
       case 'status':
@@ -116,6 +116,8 @@ class VehicleHistory {
         return 'Provincia';
       case 'city':
         return 'Ciudad';
+      case 'lugar':
+        return 'Lugar';
       case 'responsibleName':
         return 'Responsable';
       case 'responsiblePhone':
