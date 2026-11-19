@@ -1,15 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_tone.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/formatters.dart';
 import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_snack.dart';
+import '../widgets/fleet_export_sheet.dart';
 import '../widgets/fleet_insurance_sheet.dart';
+import '../widgets/root_app_bar.dart';
+import '../widgets/section_header.dart';
 import '../widgets/theme_mode_selector.dart';
+import 'settings/sync_status_view.dart';
 
+const _appVersion = '1.0.0';
+
+/// Ajustes: acciones sobre toda la flota, estado de la sincronización,
+/// apariencia e información de la app.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -20,419 +32,259 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isSyncing = false;
 
+  Future<void> _syncNow() async {
+    setState(() => _isSyncing = true);
+    try {
+      await ref.read(syncServiceProvider.notifier).fullSync();
+      await ref.read(vehicleNotifierProvider.notifier).refresh();
+      if (mounted) AppSnack.success(context, 'Todo sincronizado');
+    } catch (_) {
+      if (mounted) {
+        AppSnack.error(context, 'No se pudo sincronizar. Revisá la conexión.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalCountAsync = ref.watch(totalVehicleCountProvider);
-    final syncState = ref.watch(syncServiceProvider);
-    final queueCounts = ref.watch(syncQueueCountsProvider).valueOrNull;
-    final hasVehicles = (totalCountAsync.valueOrNull ?? 0) > 0;
-
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
+    final vehicleCount = ref.watch(totalVehicleCountProvider).valueOrNull;
+    final hasVehicles = (vehicleCount ?? 0) > 0;
+    return Scaffold(
+      appBar: const RootAppBar(title: 'Ajustes'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+            Space.s5, Space.s2, Space.s5, Space.s10),
         children: [
-          const Text(
-            'Ajustes',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
+          const SectionHeader('Flota'),
+          const Gap(Space.s2),
+          AppCard.list(
+            children: [
+              _SettingsRow(
+                icon: Icons.shield_rounded,
+                title: 'Seguro de la flota',
+                subtitle: hasVehicles
+                    ? 'Asignar compañía y vencimiento a varios vehículos'
+                    : 'Todavía no hay vehículos cargados',
+                onTap: hasVehicles
+                    ? () => showFleetInsuranceSheet(context, ref)
+                    : null,
+              ),
+              _SettingsRow(
+                icon: Icons.picture_as_pdf_rounded,
+                title: 'Exportar listado',
+                subtitle: hasVehicles
+                    ? 'PDF con los vehículos y sus vencimientos'
+                    : 'Todavía no hay vehículos cargados',
+                onTap: hasVehicles ? () => showFleetExportSheet(context) : null,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-
-          // Estadísticas
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.accentPrimary.withValues(alpha: 0.2),
-                  AppTheme.accentPrimary.withValues(alpha: 0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppTheme.accentPrimary.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.directions_car,
-                    color: AppTheme.accentPrimary,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Vehículos registrados',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    totalCountAsync.when(
-                      data: (count) => Text(
-                        count.toString(),
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.accentPrimary,
-                        ),
-                      ),
-                      loading: () => const Text(
-                        '...',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.accentPrimary,
-                        ),
-                      ),
-                      error: (_, _) => const Text(
-                        '0',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.accentPrimary,
-                        ),
-                      ),
+          const Gap(Space.s6),
+          const SectionHeader('Sincronización'),
+          const Gap(Space.s2),
+          SupabaseConfig.isConfigured
+              ? _SyncCard(isSyncing: _isSyncing, onSync: _syncNow)
+              : AppCard.list(
+                  children: const [
+                    _SettingsRow(
+                      icon: Icons.cloud_off_rounded,
+                      title: 'Sin configurar',
+                      subtitle: 'Los datos quedan solo en este teléfono',
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Estado de sincronización
-          if (SupabaseConfig.isConfigured) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    syncState.status == SyncStatus.offline
-                        ? Icons.cloud_off
-                        : syncState.status == SyncStatus.syncing
-                            ? Icons.sync
-                            : Icons.cloud_done,
-                    color: syncState.status == SyncStatus.offline
-                        ? AppTheme.warning
-                        : syncState.status == SyncStatus.error
-                            ? AppTheme.error
-                            : AppTheme.success,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          syncState.status == SyncStatus.offline
-                              ? 'Sin conexión'
-                              : syncState.status == SyncStatus.syncing
-                                  ? 'Sincronizando...'
-                                  : syncState.status == SyncStatus.error
-                                      ? 'Error de sincronización'
-                                      : 'Conectado',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (syncState.lastSync != null)
-                          Text(
-                            'Última sync: ${DateFormat('dd/MM HH:mm').format(syncState.lastSync!)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // Sección Flota
-          const Text(
-            'Flota',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.accentPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.security,
-            title: 'Seguro de la flota',
-            subtitle: hasVehicles
-                ? 'Asignar compañía y vencimiento a varios vehículos'
-                : 'Sin vehículos cargados',
-            trailing:
-                const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-            onTap: hasVehicles
-                ? () => showFleetInsuranceSheet(context, ref)
-                : null,
-          ),
-          const SizedBox(height: 32),
-
-          // Sección Sincronización
-          const Text(
-            'Sincronización',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.accentPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Sincronizar ahora
-          _SettingsTile(
-            icon: Icons.sync,
-            title: 'Sincronizar ahora',
-            subtitle: SupabaseConfig.isConfigured
-                ? 'Descargar últimos cambios desde la nube'
-                : 'Supabase no configurado',
-            trailing: _isSyncing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-            onTap: !SupabaseConfig.isConfigured || _isSyncing ? null : _syncNow,
-          ),
-
-          // Cambios locales que todavía no llegaron a la nube
-          if (queueCounts != null && !queueCounts.isEmpty) ...[
-            const SizedBox(height: 12),
-            if (queueCounts.pending > 0)
-              _SettingsTile(
-                icon: Icons.cloud_upload_outlined,
-                title: queueCounts.pending == 1
-                    ? '1 cambio pendiente de sincronizar'
-                    : '${queueCounts.pending} cambios pendientes de sincronizar',
-                subtitle: 'Se suben automáticamente al reconectar',
-              ),
-            if (queueCounts.failed > 0) ...[
-              const SizedBox(height: 12),
-              _SettingsTile(
-                icon: Icons.error_outline,
-                title: queueCounts.failed == 1
-                    ? '1 cambio no se pudo sincronizar'
-                    : '${queueCounts.failed} cambios no se pudieron sincronizar',
-                subtitle: 'Tocá para reintentar',
-                trailing:
-                    const Icon(Icons.refresh, color: AppTheme.warning),
-                onTap: () =>
-                    ref.read(syncServiceProvider.notifier).retryFailedItems(),
+          const Gap(Space.s6),
+          const SectionHeader('Apariencia'),
+          const Gap(Space.s2),
+          const ThemeModeSelector(),
+          const Gap(Space.s6),
+          const SectionHeader('Información'),
+          const Gap(Space.s2),
+          AppCard.list(
+            children: [
+              if (vehicleCount != null)
+                _SettingsRow(
+                  icon: Icons.directions_car_rounded,
+                  title: vehicleCount == 1
+                      ? '1 vehículo cargado'
+                      : '$vehicleCount vehículos cargados',
+                ),
+              _SettingsRow(
+                icon: Icons.info_rounded,
+                title: 'Acerca de',
+                subtitle: 'Versión $_appVersion',
+                onTap: () => _showAbout(context),
               ),
             ],
-          ],
-          const SizedBox(height: 32),
-
-          Text(
-            'Apariencia',
-            style: AppText.titleSm.copyWith(color: context.colors.accent),
           ),
-          const SizedBox(height: 12),
-          const ThemeModeSelector(),
-          const SizedBox(height: 32),
-
-          // Sección Info
-          const Text(
-            'Información',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.accentPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: 'Acerca de',
-            subtitle: 'Versión 1.0.0',
-            onTap: () => _showAbout(context),
-          ),
-          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Future<void> _syncNow() async {
-    setState(() => _isSyncing = true);
-
-    try {
-      await ref.read(syncServiceProvider.notifier).fullSync();
-      await ref.read(vehicleNotifierProvider.notifier).refresh();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sincronización completada'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se pudo sincronizar. Probá de nuevo.'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSyncing = false);
-      }
-    }
-  }
-
   void _showAbout(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.accentPrimary.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
+      builder: (dialogContext) {
+        final c = dialogContext.colors;
+        return AlertDialog(
+          title: const Text('Gestor de Vehículos'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Versión $_appVersion',
+                  style: AppText.label.copyWith(color: c.text)),
+              const Gap(Space.s3),
+              Text(
+                'Para gestionar los vehículos de la empresa, ordenados por '
+                'provincia y ciudad, con sus vencimientos, cargas de '
+                'combustible y mantenimientos.',
+                style: AppText.body.copyWith(color: c.textMuted),
               ),
-              child: const Icon(
-                Icons.directions_car,
-                color: AppTheme.accentPrimary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text('Gestor de Vehículos'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Versión 1.0.0'),
-            SizedBox(height: 16),
-            Text(
-              'Aplicación para gestionar vehículos de la empresa, '
-              'organizados por provincia y ciudad de Argentina.',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Con sincronización en la nube mediante Supabase.',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _SettingsTile extends StatelessWidget {
+/// Estado de la sincronización, "Sincronizar ahora" y los cambios que todavía
+/// no llegaron a la nube.
+class _SyncCard extends ConsumerWidget {
+  final bool isSyncing;
+  final VoidCallback onSync;
+
+  const _SyncCard({required this.isSyncing, required this.onSync});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(syncServiceProvider);
+    final queue = ref.watch(syncQueueCountsProvider).valueOrNull;
+    final status = syncStatusView(
+        isSyncing ? SyncStatus.syncing : syncState.status);
+    final lastSync = syncState.lastSync;
+    return AppCard.list(
+      children: [
+        _SettingsRow(
+          icon: status.icon,
+          iconTone: status.tone,
+          title: status.label,
+          subtitle: lastSync == null
+              ? null
+              : 'Última vez: ${AppFormats.dateTime(lastSync)}',
+          trailing: syncState.status == SyncStatus.error && !isSyncing
+              ? TextButton(onPressed: onSync, child: const Text('Reintentar'))
+              : null,
+        ),
+        _SettingsRow(
+          icon: Icons.sync_rounded,
+          title: 'Sincronizar ahora',
+          subtitle: 'Trae los últimos cambios de la nube',
+          trailing: isSyncing
+              ? const SizedBox.square(
+                  dimension: Sizes.iconLg,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+          onTap: isSyncing ? null : onSync,
+        ),
+        if (queue != null && queue.pending > 0)
+          _SettingsRow(
+            icon: Icons.cloud_upload_rounded,
+            title: queue.pending == 1
+                ? '1 cambio sin subir'
+                : '${queue.pending} cambios sin subir',
+            subtitle: 'Se suben solos al volver la conexión',
+          ),
+        if (queue != null && queue.failed > 0)
+          _SettingsRow(
+            icon: Icons.error_rounded,
+            iconTone: Tone.danger,
+            title: queue.failed == 1
+                ? '1 cambio no se pudo subir'
+                : '${queue.failed} cambios no se pudieron subir',
+            trailing: TextButton(
+              onPressed: () =>
+                  ref.read(syncServiceProvider.notifier).retryFailedItems(),
+              child: const Text('Reintentar'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Fila de ajustes: ícono en tile, título, detalle opcional y, si se puede
+/// tocar, chevron (o la acción que traiga).
+class _SettingsRow extends StatelessWidget {
   final IconData icon;
+  final Tone iconTone;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
 
-  const _SettingsTile({
+  const _SettingsRow({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.iconTone = Tone.info,
+    this.subtitle,
     this.trailing,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final c = context.colors;
+    final action = trailing ??
+        (onTap == null
+            ? null
+            : Icon(Icons.chevron_right_rounded,
+                size: Sizes.iconMd, color: c.textMuted));
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.accentPrimary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: Space.s4, vertical: Space.s3),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconTone.background(c),
+                  borderRadius: Radii.smAll,
+                ),
+                child: Icon(icon,
+                    size: Sizes.iconMd, color: iconTone.foreground(c)),
               ),
-              child: Icon(icon, color: AppTheme.accentPrimary, size: 22),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
+              const Gap(Space.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppText.label.copyWith(color: c.text)),
+                    if (subtitle != null)
+                      Text(subtitle!,
+                          style: AppText.caption.copyWith(color: c.textMuted)),
+                  ],
+                ),
               ),
-            ),
-            if (trailing != null) trailing!,
-          ],
+              if (action != null) ...[const Gap(Space.s2), action],
+            ],
+          ),
         ),
       ),
     );

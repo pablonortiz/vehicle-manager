@@ -37,7 +37,9 @@ class AppCard extends StatelessWidget {
          children: [
            for (var i = 0; i < children.length; i++) ...[
              if (i > 0) const Divider(),
-             children[i],
+             // Cada fila, su propio nodo: sin esto, una fila tocable al lado
+             // de una que no lo es se fusionan y TalkBack lee la card entera.
+             Semantics(container: true, child: children[i]),
            ],
          ],
        );
