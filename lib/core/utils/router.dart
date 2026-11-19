@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_tone.dart';
+import '../../presentation/widgets/empty_state.dart';
 import '../../presentation/screens/home_screen.dart';
 import '../../presentation/screens/vehicles_screen.dart';
 import '../../presentation/screens/vehicle_detail_screen.dart';
@@ -11,7 +14,8 @@ import '../../presentation/screens/fuel_charges_screen.dart';
 import '../../presentation/screens/expense_dashboard_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 final router = GoRouter(
   navigatorKey: _rootNavigatorKey,
@@ -26,9 +30,8 @@ final router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: HomeScreen(),
-          ),
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: HomeScreen()),
         ),
         GoRoute(
           path: '/vehicles',
@@ -36,16 +39,22 @@ final router = GoRouter(
             final provinceId = state.uri.queryParameters['provinceId'];
             return NoTransitionPage(
               child: VehiclesScreen(
-                provinceId: provinceId != null ? int.tryParse(provinceId) : null,
+                provinceId: provinceId != null
+                    ? int.tryParse(provinceId)
+                    : null,
               ),
             );
           },
         ),
         GoRoute(
+          path: '/expenses',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ExpenseDashboardScreen()),
+        ),
+        GoRoute(
           path: '/settings',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: SettingsScreen(),
-          ),
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: SettingsScreen()),
         ),
       ],
     ),
@@ -94,11 +103,6 @@ final router = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const SearchScreen(),
     ),
-    GoRoute(
-      path: '/expenses',
-      parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => const ExpenseDashboardScreen(),
-    ),
   ],
 );
 
@@ -111,89 +115,112 @@ class _RouteErrorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline,
-                size: 64, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 16),
-            const Text(
-              'Página no encontrada',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => context.go('/'),
-              child: const Text('Volver al inicio'),
-            ),
-          ],
+        child: EmptyState(
+          icon: Icons.error_rounded,
+          title: 'No encontramos esa pantalla',
+          actionLabel: 'Volver al inicio',
+          onAction: () => context.go('/'),
+          tone: Tone.danger,
         ),
       ),
     );
   }
 }
 
+/// Destino de la barra inferior: la acción de alta vive en el FAB de la
+/// pestaña (no aparece en Gastos ni Ajustes).
+class _Destination {
+  final String path;
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final bool showsAddVehicle;
+
+  const _Destination(
+    this.path,
+    this.label,
+    this.icon,
+    this.selectedIcon, {
+    this.showsAddVehicle = false,
+  });
+}
+
+const _destinations = [
+  _Destination(
+    '/',
+    'Inicio',
+    Icons.dashboard_outlined,
+    Icons.dashboard_rounded,
+    showsAddVehicle: true,
+  ),
+  _Destination(
+    '/vehicles',
+    'Vehículos',
+    Icons.directions_car_outlined,
+    Icons.directions_car_rounded,
+    showsAddVehicle: true,
+  ),
+  _Destination(
+    '/expenses',
+    'Gastos',
+    Icons.payments_outlined,
+    Icons.payments_rounded,
+  ),
+  _Destination(
+    '/settings',
+    'Ajustes',
+    Icons.settings_outlined,
+    Icons.settings_rounded,
+  ),
+];
+
 class MainShell extends StatelessWidget {
   final Widget child;
 
   const MainShell({super.key, required this.child});
 
+  int _selectedIndex(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    final index = _destinations.indexWhere(
+      (destination) =>
+          destination.path != '/' && location.startsWith(destination.path),
+    );
+    return index == -1 ? 0 : index;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // En Ajustes un "+" de alta de vehículo no tiene sentido.
-    final onSettings =
-        GoRouterState.of(context).uri.toString().startsWith('/settings');
+    final c = context.colors;
+    final selected = _selectedIndex(context);
 
     return Scaffold(
       body: child,
-      floatingActionButton: onSettings
-          ? null
-          : FloatingActionButton(
+      floatingActionButton: _destinations[selected].showsAddVehicle
+          ? FloatingActionButton.extended(
+              tooltip: 'Agregar vehículo',
               onPressed: () => context.push('/vehicle/new'),
-              child: const Icon(Icons.add),
-            ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _calculateSelectedIndex(context),
-        onDestinationSelected: (index) => _onItemTapped(index, context),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Inicio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(Icons.directions_car),
-            label: 'Vehículos',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Ajustes',
-          ),
-        ],
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Vehículo'),
+            )
+          : null,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: c.border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: selected,
+          onDestinationSelected: (index) =>
+              context.go(_destinations[index].path),
+          destinations: [
+            for (final destination in _destinations)
+              NavigationDestination(
+                icon: Icon(destination.icon),
+                selectedIcon: Icon(destination.selectedIcon),
+                label: destination.label,
+              ),
+          ],
+        ),
       ),
     );
-  }
-
-  int _calculateSelectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/vehicles')) return 1;
-    if (location.startsWith('/settings')) return 2;
-    return 0;
-  }
-
-  void _onItemTapped(int index, BuildContext context) {
-    switch (index) {
-      case 0:
-        context.go('/');
-        break;
-      case 1:
-        context.go('/vehicles');
-        break;
-      case 2:
-        context.go('/settings');
-        break;
-    }
   }
 }

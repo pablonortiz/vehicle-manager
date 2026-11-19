@@ -8,6 +8,7 @@ import '../../core/utils/formatters.dart';
 import '../../domain/expense_summary.dart';
 import '../providers/expense_provider.dart';
 import '../widgets/error_retry_view.dart';
+import '../widgets/root_app_bar.dart';
 
 class ExpenseDashboardScreen extends ConsumerWidget {
   const ExpenseDashboardScreen({super.key});
@@ -17,13 +18,7 @@ class ExpenseDashboardScreen extends ConsumerWidget {
     final dashboardAsync = ref.watch(expenseDashboardProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gastos'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-      ),
+      appBar: const RootAppBar(title: 'Gastos'),
       body: SafeArea(
         child: dashboardAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
