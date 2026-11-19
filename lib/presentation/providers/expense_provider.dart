@@ -4,11 +4,17 @@ import 'db_change_provider.dart';
 import 'fuel_charge_provider.dart';
 import 'vehicle_provider.dart';
 
-/// Dashboard de gastos consolidado (combustible + mantenimiento) de los últimos
-/// 6 meses, agregando todos los vehículos. Se refresca ante cambios en cualquiera
-/// de las fuentes.
+/// Períodos que se pueden elegir en Gastos, en meses.
+const expensePeriods = [3, 6, 12];
+
+/// Período elegido en Gastos; se mantiene al cambiar de pestaña.
+final expensePeriodProvider = StateProvider<int>((ref) => 6);
+
+/// Dashboard de gastos consolidado (combustible + mantenimiento) de los
+/// últimos [months] meses, agregando todos los vehículos. Se refresca ante
+/// cambios en cualquiera de las fuentes.
 final expenseDashboardProvider =
-    FutureProvider.autoDispose<ExpenseDashboard>((ref) async {
+    FutureProvider.autoDispose.family<ExpenseDashboard, int>((ref, months) async {
   ref.watch(vehiclesChangeProvider);
   ref.watch(fuelChargesChangeProvider);
   ref.watch(maintenancesChangeProvider);
@@ -24,5 +30,6 @@ final expenseDashboardProvider =
     fuelCharges: fuelCharges,
     maintenances: maintenances,
     now: DateTime.now(),
+    months: months,
   );
 });

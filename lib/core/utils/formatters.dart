@@ -40,6 +40,17 @@ class AppFormats {
 
   static String pricePerLiter(num value) => _pricePerLiter.format(value);
 
+  static final NumberFormat _thousands = NumberFormat('#,##0.#', 'es_AR');
+  static final NumberFormat _millions = NumberFormat('#,##0.##', 'es_AR');
+
+  /// Montos cortos para ejes de gráficos: "$ 900", "$ 250 mil", "$ 1,25 M".
+  static String moneyCompact(num value) {
+    final size = value.abs();
+    if (size >= 1e6) return '\$\u00A0${_millions.format(value / 1e6)}\u00A0M';
+    if (size >= 1e3) return '\$\u00A0${_thousands.format(value / 1e3)}\u00A0mil';
+    return money(value);
+  }
+
   /// Fecha de lectura: "12 dic 2026" (en un campo en edición va dd/MM/yyyy).
   static String date(DateTime value) => _stripDots(_date.format(value));
 

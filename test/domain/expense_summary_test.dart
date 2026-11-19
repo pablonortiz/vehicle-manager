@@ -80,6 +80,23 @@ void main() {
       );
       expect(dash.byVehicle.length, 1);
       expect(dash.byVehicle.first.vehicleId, 'a');
+      expect(dash.byVehicle.first.vehicle?.plate, 'AAA');
+      expect(dash.vehiclesWithoutExpenses, 1);
+    });
+
+    test('el rango sigue la cantidad de meses pedida', () {
+      final dash = buildExpenseDashboard(
+        vehicles: [_v('a', 'AAA')],
+        fuelCharges: [
+          _f('a', DateTime(2026, 6, 1), 1000),
+          _f('a', DateTime(2025, 8, 1), 500), // entra en 12 meses, no en 6
+        ],
+        maintenances: [],
+        now: now,
+        months: 12,
+      );
+      expect(dash.byMonth.length, 12);
+      expect(dash.grandTotal, 1500);
     });
   });
 }

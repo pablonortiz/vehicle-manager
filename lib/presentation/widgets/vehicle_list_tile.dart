@@ -25,6 +25,9 @@ class VehicleListTile extends StatelessWidget {
   /// Término buscado: se resalta en el nombre, la ubicación y el responsable.
   final String? highlight;
 
+  /// Línea extra al pie, propia del contexto (el desglose en Gastos).
+  final Widget? footer;
+
   const VehicleListTile({
     super.key,
     required this.vehicle,
@@ -33,6 +36,7 @@ class VehicleListTile extends StatelessWidget {
     this.showExpiryAlert = true,
     this.contentPadding = cardPadding,
     this.highlight,
+    this.footer,
   });
 
   /// Dentro de una `AppCard.list`.
@@ -107,6 +111,10 @@ class VehicleListTile extends StatelessWidget {
                       ],
                     ),
                     if (showExpiryAlert) _ExpiryAlert(vehicle: vehicle),
+                    if (footer != null) ...[
+                      const Gap(Space.s1),
+                      footer!,
+                    ],
                   ],
                 ),
               ),

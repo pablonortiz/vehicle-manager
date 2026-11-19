@@ -25,4 +25,10 @@ void main() {
   test('precio por litro con dos decimales', () {
     expect(AppFormats.pricePerLiter(1289.5), '\$\u00A01.289,50');
   });
+
+  test('montos cortos para ejes', () {
+    expect(AppFormats.moneyCompact(900), '\$\u00A0900');
+    expect(AppFormats.moneyCompact(250000), '\$\u00A0250\u00A0mil');
+    expect(AppFormats.moneyCompact(1250000), '\$\u00A01,25\u00A0M');
+  });
 }

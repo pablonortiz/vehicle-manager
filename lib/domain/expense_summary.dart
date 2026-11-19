@@ -9,11 +9,15 @@ class VehicleExpense {
   final double fuelTotal;
   final double maintenanceTotal;
 
+  /// El vehículo, para mostrarlo con la misma fila que en el resto de la app.
+  final Vehicle? vehicle;
+
   const VehicleExpense({
     required this.vehicleId,
     required this.label,
     required this.fuelTotal,
     required this.maintenanceTotal,
+    this.vehicle,
   });
 
   double get total => fuelTotal + maintenanceTotal;
@@ -45,10 +49,14 @@ class ExpenseDashboard {
   /// no puede sumar. Sirve para avisar que los totales están incompletos.
   final int uncostedMaintenances;
 
+  /// Vehículos que no gastaron nada en el período (no aparecen en el ranking).
+  final int vehiclesWithoutExpenses;
+
   const ExpenseDashboard({
     required this.byVehicle,
     required this.byMonth,
     this.uncostedMaintenances = 0,
+    this.vehiclesWithoutExpenses = 0,
   });
 
   double get fuelTotal =>
@@ -113,6 +121,7 @@ ExpenseDashboard buildExpenseDashboard({
             label: '${v.displayName} (${v.plate})',
             fuelTotal: fuelByVehicle[v.id] ?? 0,
             maintenanceTotal: maintByVehicle[v.id] ?? 0,
+            vehicle: v,
           ))
       .where((e) => e.total > 0)
       .toList()
@@ -131,5 +140,6 @@ ExpenseDashboard buildExpenseDashboard({
     byVehicle: byVehicle,
     byMonth: byMonth,
     uncostedMaintenances: uncostedMaintenances,
+    vehiclesWithoutExpenses: vehicles.length - byVehicle.length,
   );
 }
