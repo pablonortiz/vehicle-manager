@@ -134,7 +134,9 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
     return MaterialApp.router(
       title: 'Gestor de Vehículos',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       routerConfig: router,
       locale: const Locale('es', 'ES'),
       supportedLocales: const [

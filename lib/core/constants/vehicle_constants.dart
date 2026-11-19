@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 enum VehicleType {
   car,
@@ -154,18 +155,18 @@ extension FuelTypeExtension on FuelType {
 // Colores predefinidos para vehículos
 class VehicleColors {
   static const List<VehicleColorOption> options = [
-    VehicleColorOption(name: 'Blanco', color: Color(0xFFFFFFFF)),
-    VehicleColorOption(name: 'Negro', color: Color(0xFF1A1A1A)),
-    VehicleColorOption(name: 'Gris Plata', color: Color(0xFFC0C0C0)),
-    VehicleColorOption(name: 'Gris Oscuro', color: Color(0xFF4A4A4A)),
-    VehicleColorOption(name: 'Rojo', color: Color(0xFFDC2626)),
-    VehicleColorOption(name: 'Azul', color: Color(0xFF2563EB)),
-    VehicleColorOption(name: 'Azul Marino', color: Color(0xFF1E3A5F)),
-    VehicleColorOption(name: 'Verde', color: Color(0xFF16A34A)),
-    VehicleColorOption(name: 'Amarillo', color: Color(0xFFEAB308)),
-    VehicleColorOption(name: 'Naranja', color: Color(0xFFEA580C)),
-    VehicleColorOption(name: 'Marrón', color: Color(0xFF78350F)),
-    VehicleColorOption(name: 'Beige', color: Color(0xFFD4C5A9)),
+    VehicleColorOption(name: 'Blanco', color: PaintColors.blanco),
+    VehicleColorOption(name: 'Negro', color: PaintColors.negro),
+    VehicleColorOption(name: 'Gris Plata', color: PaintColors.grisPlata),
+    VehicleColorOption(name: 'Gris Oscuro', color: PaintColors.grisOscuro),
+    VehicleColorOption(name: 'Rojo', color: PaintColors.rojo),
+    VehicleColorOption(name: 'Azul', color: PaintColors.azul),
+    VehicleColorOption(name: 'Azul Marino', color: PaintColors.azulMarino),
+    VehicleColorOption(name: 'Verde', color: PaintColors.verde),
+    VehicleColorOption(name: 'Amarillo', color: PaintColors.amarillo),
+    VehicleColorOption(name: 'Naranja', color: PaintColors.naranja),
+    VehicleColorOption(name: 'Marrón', color: PaintColors.marron),
+    VehicleColorOption(name: 'Beige', color: PaintColors.beige),
   ];
 
   static VehicleColorOption getByColor(Color color) {
