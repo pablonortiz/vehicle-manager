@@ -84,6 +84,9 @@ class AppDateField extends StatelessWidget {
           label: label,
           value: current == null ? 'Sin fecha' : _format.format(current),
           excludeSemantics: true,
+          // Sin esto TalkBack no lo puede activar: excludeSemantics descarta
+          // también la acción del InkWell.
+          onTap: () => _pick(context),
           child: InkWell(
             onTap: () => _pick(context),
             borderRadius: Radii.mdAll,

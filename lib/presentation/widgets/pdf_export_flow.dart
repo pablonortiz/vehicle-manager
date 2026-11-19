@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
+import 'app_snack.dart';
 
 /// Flujo común de exportar un PDF: diálogo de progreso → generar → cerrar el
 /// diálogo → compartir → feedback. El diálogo se cierra una sola vez (flag
@@ -15,7 +18,7 @@ Future<void> runPdfExport(
   required Future<Uint8List> Function() generate,
   required String fileName,
   required String successMessage,
-  required String errorPrefix,
+  required String errorMessage,
 }) async {
   _showProgressDialog(context, progressTitle, progressSubtitle);
 
@@ -30,48 +33,45 @@ Future<void> runPdfExport(
 
     await Printing.sharePdf(bytes: pdfBytes, filename: '$fileName.pdf');
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(successMessage),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  } catch (e) {
+    if (context.mounted) AppSnack.success(context, successMessage);
+  } catch (_) {
     if (dialogOpen && context.mounted) {
       Navigator.of(context, rootNavigator: true).pop();
     }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$errorPrefix: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
+    if (context.mounted) AppSnack.error(context, errorMessage);
   }
 }
 
 void _showProgressDialog(BuildContext context, String title, String subtitle) {
-  showDialog(
+  showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          Text(title, style: const TextStyle(color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+    useRootNavigator: true,
+    builder: (dialogContext) {
+      final c = dialogContext.colors;
+      return PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const Gap(Space.s5),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppText.titleSm.copyWith(color: c.text)),
+                    const Gap(Space.s1),
+                    Text(subtitle,
+                        style: AppText.caption.copyWith(color: c.textMuted)),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 }

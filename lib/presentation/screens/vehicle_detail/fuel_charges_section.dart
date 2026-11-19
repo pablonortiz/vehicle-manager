@@ -1,135 +1,103 @@
 part of '../vehicle_detail_screen.dart';
 
-// Sección de cargas de combustible
-class _FuelChargesSection extends ConsumerStatefulWidget {
-  final List<FuelCharge> recentCharges;
+/// Últimas cargas de combustible, con acceso a la pantalla de cargas. El
+/// resumen mensual vive allá: acá "Sin cargas este mes" confundía cuando la
+/// última carga era de otro mes.
+class _FuelChargesSection extends ConsumerWidget {
   final String vehicleId;
 
-  const _FuelChargesSection({
-    required this.recentCharges,
-    required this.vehicleId,
-  });
+  const _FuelChargesSection({required this.vehicleId});
+
+  void _openCharges(BuildContext context) =>
+      context.push('/vehicle/$vehicleId/fuel');
 
   @override
-  ConsumerState<_FuelChargesSection> createState() => _FuelChargesSectionState();
-}
-
-class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    // Get current month summary
-    final now = DateTime.now();
-    final summaryParams = MonthlyFuelParams(
-      vehicleId: widget.vehicleId,
-      year: now.year,
-      month: now.month,
-    );
-    final summaryAsync = ref.watch(fuelChargeSummaryProvider(summaryParams));
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chargesAsync = ref.watch(recentFuelChargesProvider(vehicleId));
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _SectionTitle(title: 'Combustible'),
-            TextButton.icon(
-              onPressed: () => context.push('/vehicle/${widget.vehicleId}/fuel'),
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('Ver historial'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.accentPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ],
+        SectionHeader(
+          'Cargas de combustible',
+          actionLabel: 'Ver todas',
+          onAction: () => _openCharges(context),
         ),
-        const SizedBox(height: 12),
-
-        // Monthly summary card (variante compacta del widget compartido)
-        summaryAsync.when(
-          data: (summary) => FuelSummaryCard(summary: summary, compact: true),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) => const SizedBox.shrink(),
-        ),
-
-        if (widget.recentCharges.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'Últimas cargas',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
+        const Gap(Space.s2),
+        chargesAsync.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => AppNotice.error(
+            message: 'No se pudieron cargar las cargas.',
+            onRetry: () => ref.invalidate(recentFuelChargesProvider(vehicleId)),
           ),
-          const SizedBox(height: 8),
-          ...widget.recentCharges.map((charge) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentPrimary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.local_gas_station,
-                    size: 16,
-                    color: AppTheme.accentPrimary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppFormats.liters(charge.liters),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
+          data: (charges) => charges.isEmpty
+              ? const _EmptyLine('Todavía no hay cargas.')
+              : AppCard.list(
+                  children: [
+                    for (final charge in charges)
+                      _RecentChargeRow(
+                        charge: charge,
+                        onTap: () => _openCharges(context),
                       ),
-                      Text(
-                        dateFormat.format(charge.date),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
-                Text(
-                  currencyFormat.format(charge.price),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.accentPrimary,
-                  ),
-                ),
-              ],
-            ),
-          )),
-        ],
+        ),
       ],
     );
   }
 }
 
+class _RecentChargeRow extends StatelessWidget {
+  final FuelCharge charge;
+  final VoidCallback onTap;
+
+  const _RecentChargeRow({required this.charge, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: Space.s4, vertical: Space.s2),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: c.accentSoft,
+                  borderRadius: Radii.smAll,
+                ),
+                child: Icon(Icons.local_gas_station_rounded,
+                    size: Sizes.iconMd, color: c.catFuel),
+              ),
+              const Gap(Space.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppFormats.liters(charge.liters),
+                      style: AppText.label.tabular.copyWith(color: c.text),
+                    ),
+                    Text(
+                      AppFormats.date(charge.date),
+                      style: AppText.caption.copyWith(color: c.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                AppFormats.money(charge.price),
+                style: AppText.label.tabular.copyWith(color: c.text),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

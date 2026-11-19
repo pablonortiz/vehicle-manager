@@ -33,6 +33,7 @@ class AppCard extends StatelessWidget {
        onTap = null,
        child = Column(
          mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: CrossAxisAlignment.stretch,
          children: [
            for (var i = 0; i < children.length; i++) ...[
              if (i > 0) const Divider(),

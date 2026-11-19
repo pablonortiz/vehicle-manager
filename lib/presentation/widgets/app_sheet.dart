@@ -16,7 +16,8 @@ Future<T?> showAppSheet<T>(
 }) {
   return showModalBottomSheet<T>(
     context: context,
-    builder: builder,
+    builder: (sheetContext) =>
+        _SheetDragScope(enabled: enableDrag, child: builder(sheetContext)),
     isScrollControlled: true,
     useRootNavigator: true,
     useSafeArea: true,
@@ -24,8 +25,25 @@ Future<T?> showAppSheet<T>(
   );
 }
 
-/// Marco común de todo sheet: handle, título y "Cerrar" arriba, contenido con
-/// scroll y la acción primaria fija al pie, por encima del teclado.
+/// Avisa a [AppSheet] si su sheet se puede arrastrar: sin arrastre no se
+/// dibuja el handle, que lo prometería.
+class _SheetDragScope extends InheritedWidget {
+  final bool enabled;
+
+  const _SheetDragScope({required this.enabled, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SheetDragScope>()?.enabled ??
+      true;
+
+  @override
+  bool updateShouldNotify(_SheetDragScope oldWidget) =>
+      enabled != oldWidget.enabled;
+}
+
+/// Marco común de todo sheet: handle (si se puede arrastrar), título y
+/// "Cerrar" arriba, contenido con scroll y la acción primaria fija al pie, por
+/// encima del teclado.
 class AppSheet extends StatelessWidget {
   final String title;
   final Widget child;
@@ -55,17 +73,20 @@ class AppSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Gap(Space.s2),
-            Center(
-              child: Container(
-                width: 32,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: c.borderStrong,
-                  borderRadius: Radii.fullAll,
+            if (_SheetDragScope.of(context)) ...[
+              const Gap(Space.s2),
+              Center(
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: c.borderStrong,
+                    borderRadius: Radii.fullAll,
+                  ),
                 ),
               ),
-            ),
+            ] else
+              const Gap(Space.s3),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 Space.s5,

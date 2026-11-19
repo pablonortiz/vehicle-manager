@@ -1,200 +1,55 @@
 part of '../vehicle_detail_screen.dart';
 
-// Sección de fotos de documentos (Cédula Verde, Azul, Título)
+/// Papeles del vehículo (cédulas, título y VTV): una lista agrupada con una
+/// fila por tipo, en vez de una card grande por tipo aunque esté vacío.
 class _DocumentPhotosSection extends ConsumerStatefulWidget {
   final List<DocumentPhoto> photos;
   final String vehicleId;
 
-  const _DocumentPhotosSection({
-    required this.photos,
-    required this.vehicleId,
-  });
+  const _DocumentPhotosSection({required this.photos, required this.vehicleId});
 
   @override
-  ConsumerState<_DocumentPhotosSection> createState() => _DocumentPhotosSectionState();
+  ConsumerState<_DocumentPhotosSection> createState() =>
+      _DocumentPhotosSectionState();
 }
 
-class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> {
-  bool _isUploading = false;
+class _DocumentPhotosSectionState
+    extends ConsumerState<_DocumentPhotosSection> {
   DocumentType? _uploadingType;
 
   @override
   Widget build(BuildContext context) {
-    // Agrupar las fotos por tipo en una sola pasada, en vez de filtrar la lista
-    // completa una vez por cada DocumentType en cada build.
+    // Agrupar por tipo en una sola pasada.
     final photosByType = <DocumentType, List<DocumentPhoto>>{};
     for (final photo in widget.photos) {
       (photosByType[photo.documentType] ??= []).add(photo);
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionTitle(title: 'Documentos'),
-        const SizedBox(height: 12),
-        ...DocumentType.values.map(
-          (type) => _buildDocumentTypeSection(type, photosByType[type] ?? const []),
+        const SectionHeader('Papeles'),
+        const Gap(Space.s2),
+        AppCard.list(
+          children: [
+            for (final type in DocumentType.values)
+              _DocumentRow(
+                type: type,
+                photos: photosByType[type] ?? const [],
+                isUploading: _uploadingType == type,
+                onAdd: _uploadingType == null ? () => _addPhoto(type) : null,
+                onOpen: _viewPhoto,
+              ),
+          ],
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildDocumentTypeSection(
-      DocumentType type, List<DocumentPhoto> photosForType) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    type == DocumentType.titulo
-                        ? Icons.description
-                        : type == DocumentType.vtv
-                            ? Icons.verified_user
-                            : Icons.credit_card,
-                    size: 20,
-                    color: AppTheme.accentPrimary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    type.label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (photosForType.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentPrimary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${photosForType.length}',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.accentPrimary),
-                      ),
-                    ),
-                ],
-              ),
-              _isUploading && _uploadingType == type
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      onPressed: () => _addPhoto(type),
-                      icon: const Icon(Icons.add_a_photo, size: 20),
-                      color: AppTheme.accentPrimary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      tooltip: 'Agregar foto del documento',
-                    ),
-            ],
-          ),
-          if (photosForType.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 70,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: photosForType.length,
-                itemBuilder: (context, index) {
-                  final photo = photosForType[index];
-                  return GestureDetector(
-                    onTap: () {
-                      if (photo.isPdf) {
-                        _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
-                      } else {
-                        _showFullScreenImage(context, photo.cloudinaryUrl);
-                      }
-                    },
-                    onLongPress: () => _showPhotoOptions(photo),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      width: 70,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: photo.isPdf
-                            ? _buildPdfThumbnailSmall(photo.fileName)
-                            : CachedNetworkImage(
-                                imageUrl: photo.cloudinaryUrl,
-                                fit: BoxFit.cover,
-                                placeholder: (_, _) => const Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                errorWidget: (_, _, _) => const Icon(Icons.error),
-                              ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ] else
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Sin fotos',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _addPhoto(DocumentType type) async {
-    final source = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Cámara'),
-              onTap: () => Navigator.pop(ctx, 'camera'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Galería (múltiples)'),
-              onTap: () => Navigator.pop(ctx, 'gallery'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_file),
-              title: const Text('Archivo (PDF/Imagen)'),
-              onTap: () => Navigator.pop(ctx, 'file'),
-            ),
-          ],
-        ),
-      ),
-    );
-
+    final source = await _pickUploadSource(context, title: 'Agregar ${type.label}');
     if (source == null) return;
 
-    setState(() {
-      _isUploading = true;
-      _uploadingType = type;
-    });
-
+    setState(() => _uploadingType = type);
     try {
       final cloudinary = CloudinaryService.instance;
       final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
@@ -210,76 +65,129 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
           fileName: result.fileName,
         ));
       }
-
       ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('No se pudo subir el documento'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppSnack.error(context, 'No se pudo subir el papel. Revisá la conexión.');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-          _uploadingType = null;
-        });
-      }
+      if (mounted) setState(() => _uploadingType = null);
     }
   }
 
-  void _showPhotoOptions(DocumentPhoto photo) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.fullscreen),
-              title: const Text('Ver en pantalla completa'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showFullScreenImage(context, photo.cloudinaryUrl);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: AppTheme.error),
-              title: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                if (!await confirmDelete(context,
-                    title: 'Eliminar documento',
-                    message: '¿Eliminar esta foto del documento? No se puede deshacer.')) {
-                  return;
-                }
-                if (!mounted) return;
-                final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
-                try {
-                  await docPhotoRepo.deletePhoto(photo.id!);
-                  ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Foto eliminada')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('No se pudo eliminar el documento'),
-                        backgroundColor: AppTheme.error,
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-          ],
+  void _viewPhoto(DocumentPhoto photo) {
+    _openAttachment(
+      context,
+      url: photo.cloudinaryUrl,
+      isPdf: photo.isPdf,
+      fileName: photo.fileName,
+      actions: [
+        _ViewerAction(
+          label: 'Eliminar',
+          icon: Icons.delete_rounded,
+          destructive: true,
+          onSelected: () => _deletePhoto(photo),
         ),
+      ],
+    );
+  }
+
+  /// Irreversible: el archivo se borra también de la nube.
+  Future<void> _deletePhoto(DocumentPhoto photo) async {
+    if (!await confirmDestructive(
+      context,
+      title: '¿Eliminar este papel?',
+      message: 'Se borra del vehículo y de la nube. No se puede deshacer.',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    try {
+      await ref.read(documentPhotoRepositoryProvider).deletePhoto(photo.id!);
+      ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
+      if (mounted) AppSnack.success(context, 'Papel eliminado');
+    } catch (_) {
+      if (mounted) AppSnack.error(context, 'No se pudo eliminar el papel');
+    }
+  }
+}
+
+class _DocumentRow extends StatelessWidget {
+  final DocumentType type;
+  final List<DocumentPhoto> photos;
+  final bool isUploading;
+  final VoidCallback? onAdd;
+  final ValueChanged<DocumentPhoto> onOpen;
+
+  const _DocumentRow({
+    required this.type,
+    required this.photos,
+    required this.isUploading,
+    required this.onAdd,
+    required this.onOpen,
+  });
+
+  IconData get _icon => switch (type) {
+        DocumentType.titulo => Icons.description_rounded,
+        DocumentType.vtv => Icons.verified_rounded,
+        _ => Icons.badge_rounded,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(
+          left: Space.s4, right: Space.s1, top: Space.s1, bottom: Space.s3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_icon, size: Sizes.iconMd, color: c.textMuted),
+              const Gap(Space.s3),
+              Expanded(
+                child: Text(type.label, style: AppText.label.copyWith(color: c.text)),
+              ),
+              if (photos.isNotEmpty) CountBadge(photos.length),
+              isUploading
+                  ? const Padding(
+                      padding: EdgeInsets.all(Space.s3),
+                      child: SizedBox.square(
+                        dimension: Sizes.iconLg,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: 'Agregar ${type.label}',
+                      onPressed: onAdd,
+                      icon: const Icon(Icons.add_a_photo_rounded),
+                    ),
+            ],
+          ),
+          Padding(
+            // Alineado con el nombre, no con el ícono.
+            padding: const EdgeInsets.only(left: Sizes.iconMd + Space.s3),
+            child: photos.isEmpty
+                ? Text('Sin cargar',
+                    style: AppText.caption.copyWith(color: c.textMuted))
+                : SizedBox(
+                    height: 64,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: photos.length,
+                      separatorBuilder: (_, _) => const Gap(Space.s2),
+                      itemBuilder: (context, index) => _Thumbnail(
+                        url: photos[index].cloudinaryUrl,
+                        isPdf: photos[index].isPdf,
+                        size: 64,
+                        semanticLabel: '${type.label}, archivo ${index + 1}',
+                        onTap: () => onOpen(photos[index]),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 part of '../vehicle_detail_screen.dart';
 
-// Sección de mantenimientos
+/// Mantenimientos: lista agrupada; tocar abre la edición, y eliminar (desde el
+/// sheet) es reversible con "Deshacer", sin diálogo previo.
 class _MaintenancesSection extends ConsumerStatefulWidget {
   final List<Maintenance> maintenances;
   final String vehicleId;
@@ -11,194 +12,230 @@ class _MaintenancesSection extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_MaintenancesSection> createState() => _MaintenancesSectionState();
+  ConsumerState<_MaintenancesSection> createState() =>
+      _MaintenancesSectionState();
 }
 
 class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
-  // Borrado diferido: ocultos mientras corre el SnackBar de "Deshacer".
+  // Borrado diferido: ocultos mientras corre el snackbar de "Deshacer".
   final Set<String> _pendingDeleteIds = {};
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
+    final c = context.colors;
     final maintenances = widget.maintenances
-        .where((m) => !_pendingDeleteIds.contains(m.id))
+        .where((maintenance) => !_pendingDeleteIds.contains(maintenance.id))
         .toList();
-    final totalCost =
-        maintenances.fold<double>(0, (sum, m) => sum + (m.cost ?? 0));
+    final totalCost = maintenances.fold<double>(
+        0, (sum, maintenance) => sum + (maintenance.cost ?? 0));
     final withoutCost =
-        maintenances.where((m) => (m.cost ?? 0) == 0).length;
+        maintenances.where((maintenance) => (maintenance.cost ?? 0) == 0).length;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _SectionTitle(title: 'Mantenimientos'),
-            IconButton(
-              onPressed: () => _showMaintenanceDialog(null),
-              icon: const Icon(Icons.add, color: AppTheme.accentPrimary),
-              tooltip: 'Agregar mantenimiento',
-            ),
-          ],
+        SectionHeader(
+          'Mantenimientos',
+          count: maintenances.isEmpty ? null : maintenances.length,
+          actionLabel: 'Agregar',
+          actionIcon: Icons.add_rounded,
+          onAction: () => _openSheet(null),
         ),
         if (totalCost > 0)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              withoutCost > 0
-                  ? 'Total: ${AppFormats.money(totalCost)} · $withoutCost sin costo cargado'
-                  : 'Total: ${AppFormats.money(totalCost)}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-              ),
-            ),
+          Text(
+            withoutCost > 0
+                ? 'Total ${AppFormats.money(totalCost)} · $withoutCost sin costo cargado'
+                : 'Total ${AppFormats.money(totalCost)}',
+            style: AppText.caption.tabular.copyWith(color: c.textMuted),
           ),
-        const SizedBox(height: 12),
+        const Gap(Space.s2),
         if (maintenances.isEmpty)
-          EmptyState(
-            icon: Icons.build_outlined,
-            title: 'Sin mantenimientos registrados',
-            actionLabel: 'Agregar mantenimiento',
-            onAction: () => _showMaintenanceDialog(null),
-          )
+          const _EmptyLine('Todavía no hay mantenimientos.')
         else
-          ...maintenances.map((m) => _MaintenanceCard(
-            maintenance: m,
-            dateFormat: dateFormat,
-            onTap: () => _showMaintenanceDialog(m),
-            onDelete: () => _deleteMaintenance(m),
-          )),
+          AppCard.list(
+            children: [
+              for (final maintenance in maintenances)
+                _MaintenanceRow(
+                  maintenance: maintenance,
+                  onTap: () => _openSheet(maintenance),
+                ),
+            ],
+          ),
       ],
     );
   }
 
-  void _showMaintenanceDialog(Maintenance? maintenance) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _MaintenanceFormSheet(
+  Future<void> _openSheet(Maintenance? maintenance) async {
+    final outcome = await showAppSheet<_SheetOutcome>(
+      context,
+      enableDrag: false,
+      builder: (_) => _MaintenanceFormSheet(
         vehicleId: widget.vehicleId,
         maintenance: maintenance,
-        onSaved: (message) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(message)),
-            );
-          }
-        },
       ),
     );
+    if (!mounted) return;
+    switch (outcome) {
+      case _SheetOutcome.saved:
+        AppSnack.success(context, 'Mantenimiento guardado');
+      case _SheetOutcome.delete:
+        await _deleteMaintenance(maintenance!);
+      case null:
+        break;
+    }
   }
 
   Future<void> _deleteMaintenance(Maintenance maintenance) async {
-    if (!await confirmDelete(context,
-        title: 'Eliminar mantenimiento',
-        message: '¿Eliminar este mantenimiento y sus facturas?')) {
-      return;
-    }
-    if (!mounted) return;
-
-    // Diferido: se oculta ya, y el delete real corre cuando expira el
-    // SnackBar (si el usuario no tocó "Deshacer").
-    final messenger = ScaffoldMessenger.of(context);
-    final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
+    final repo = ref.read(maintenanceRepositoryProvider);
     setState(() => _pendingDeleteIds.add(maintenance.id!));
-
-    final controller = messenger.showSnackBar(SnackBar(
-      content: const Text('Mantenimiento eliminado'),
-      duration: const Duration(seconds: 5),
-      action: SnackBarAction(label: 'Deshacer', onPressed: () {}),
-    ));
-    final reason = await controller.closed;
-
-    if (reason == SnackBarClosedReason.action) {
+    final commit =
+        await AppSnack.undoableDelete(context, 'Mantenimiento eliminado');
+    if (!commit) {
       if (mounted) setState(() => _pendingDeleteIds.remove(maintenance.id));
       return;
     }
     try {
-      await maintenanceRepo.deleteMaintenance(maintenance.id!);
+      await repo.deleteMaintenance(maintenance.id!);
     } finally {
       if (mounted) setState(() => _pendingDeleteIds.remove(maintenance.id));
     }
   }
 }
 
-// Contenido del modal de alta/edición de mantenimiento.
-// StatefulWidget dedicado para que los TextEditingController se liberen en dispose.
+class _MaintenanceRow extends StatelessWidget {
+  final Maintenance maintenance;
+  final VoidCallback onTap;
+
+  const _MaintenanceRow({required this.maintenance, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final cost = maintenance.cost;
+    final attachments = maintenance.invoices.length;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: Space.s4, vertical: Space.s3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: c.catMaintenanceSoft,
+                borderRadius: Radii.smAll,
+              ),
+              child: Icon(Icons.build_rounded,
+                  size: Sizes.iconMd, color: c.catMaintenance),
+            ),
+            const Gap(Space.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AppFormats.date(maintenance.date),
+                          style: AppText.label.copyWith(color: c.text),
+                        ),
+                      ),
+                      Text(
+                        cost != null && cost > 0
+                            ? AppFormats.money(cost)
+                            : 'Sin costo',
+                        style: AppText.label.tabular.copyWith(
+                          color: cost != null && cost > 0 ? c.text : c.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(Space.s1),
+                  Text(
+                    maintenance.detail,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.body.copyWith(color: c.text),
+                  ),
+                  if (attachments > 0) ...[
+                    const Gap(Space.s1),
+                    Row(
+                      children: [
+                        Icon(Icons.attach_file_rounded,
+                            size: Sizes.iconSm, color: c.textMuted),
+                        const Gap(Space.s1),
+                        Text(
+                          attachments == 1 ? '1 adjunto' : '$attachments adjuntos',
+                          style: AppText.caption.copyWith(color: c.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Alta y edición de un mantenimiento. StatefulWidget propio para liberar los
+/// controllers en dispose.
 class _MaintenanceFormSheet extends ConsumerStatefulWidget {
   final String vehicleId;
   final Maintenance? maintenance;
-  final void Function(String message) onSaved;
 
-  const _MaintenanceFormSheet({
-    required this.vehicleId,
-    required this.maintenance,
-    required this.onSaved,
-  });
+  const _MaintenanceFormSheet({required this.vehicleId, required this.maintenance});
 
   @override
-  ConsumerState<_MaintenanceFormSheet> createState() => _MaintenanceFormSheetState();
+  ConsumerState<_MaintenanceFormSheet> createState() =>
+      _MaintenanceFormSheetState();
 }
 
 class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _dateController;
   late final TextEditingController _detailController;
   late final TextEditingController _costController;
-  late DateTime? _selectedDate;
+  late final String _initialCost;
+  DateTime? _selectedDate;
+  String? _dateError;
   late List<MaintenanceInvoice> _existingInvoices;
   final List<PlatformFile> _pendingFiles = [];
   bool _isSaving = false;
   bool _isSelectingFiles = false;
-  bool _hasChanges = false;
 
   bool get _isEditing => widget.maintenance != null;
+
+  /// Comparado contra lo guardado: tocar un campo sin cambiarlo no cuenta.
+  bool get _isDirty {
+    final original = widget.maintenance;
+    return _detailController.text.trim() != (original?.detail ?? '').trim() ||
+        _costController.text != _initialCost ||
+        !DateUtils.isSameDay(_selectedDate, original?.date) ||
+        _pendingFiles.isNotEmpty;
+  }
 
   @override
   void initState() {
     super.initState();
     final maintenance = widget.maintenance;
-    _dateController = TextEditingController(
-      text: maintenance != null
-          ? DateFormat('dd/MM/yyyy').format(maintenance.date)
-          : '',
-    );
     _detailController = TextEditingController(text: maintenance?.detail ?? '');
-    _costController = TextEditingController(
-      text: maintenance?.cost != null
-          ? formatWithDots(maintenance!.cost!.toStringAsFixed(0))
-          : '',
-    );
+    _initialCost = maintenance?.cost != null
+        ? formatWithDots(maintenance!.cost!.toStringAsFixed(0))
+        : '';
+    _costController = TextEditingController(text: _initialCost);
     _selectedDate = maintenance?.date;
     _existingInvoices = List.from(maintenance?.invoices ?? []);
-    _dateController.addListener(_markDirty);
-    _detailController.addListener(_markDirty);
-    _costController.addListener(_markDirty);
-  }
-
-  void _markDirty() {
-    if (!_hasChanges) _hasChanges = true;
-  }
-
-  Future<void> _attemptClose() async {
-    final dirty = _hasChanges || _pendingFiles.isNotEmpty;
-    if (dirty) {
-      final discard = await confirmDiscard(context);
-      if (!discard) return;
-    }
-    if (mounted) Navigator.pop(context);
   }
 
   @override
   void dispose() {
-    _dateController.dispose();
     _detailController.dispose();
     _costController.dispose();
     super.dispose();
@@ -206,241 +243,158 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return AppSheet(
+      title: _isEditing ? 'Editar mantenimiento' : 'Nuevo mantenimiento',
+      hasUnsavedChanges: _isDirty && !_isSaving,
+      footer: SizedBox(
+        width: double.infinity,
+        height: Sizes.controlH,
+        child: FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: Text(_isSaving ? 'Guardando…' : 'Guardar mantenimiento'),
+        ),
       ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _isEditing ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppDateField(
+              label: 'Fecha',
+              required: true,
+              value: _selectedDate,
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+              errorText: _dateError,
+              onChanged: (date) => setState(() {
+                _selectedDate = date;
+                _dateError = null;
+              }),
+            ),
+            const Gap(Space.s4),
+            AppTextField(
+              label: 'Detalle',
+              required: true,
+              controller: _detailController,
+              hint: 'Qué se hizo, en qué taller, a cuántos km',
+              maxLines: 4,
+              minLines: 3,
+              enabled: !_isSaving,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Contá qué se hizo'
+                  : null,
+            ),
+            const Gap(Space.s4),
+            AppTextField(
+              label: 'Costo',
+              controller: _costController,
+              hint: 'Opcional',
+              prefixText: r'$ ',
+              keyboardType: TextInputType.number,
+              enabled: !_isSaving,
+              inputFormatters: [ThousandsSeparatorFormatter()],
+              onChanged: (_) => setState(() {}),
+            ),
+            const Gap(Space.s4),
+            _AttachmentsField(
+              emptyHint: 'Facturas o fotos del trabajo, en PDF o imagen.',
+              isBusy: _isSaving || _isSelectingFiles,
+              onAdd: _pickFiles,
+              attachments: [
+                for (final invoice in _existingInvoices)
+                  _AttachmentChip(
+                    label: invoice.fileName ?? 'Archivo',
+                    isPdf: invoice.isPdf,
+                    onOpen: () => _openAttachment(
+                      context,
+                      url: invoice.cloudinaryUrl,
+                      isPdf: invoice.isPdf,
+                      fileName: invoice.fileName,
                     ),
+                    onRemove: () => _deleteInvoice(invoice),
                   ),
-                  IconButton(
-                    onPressed: _isSaving ? null : _attemptClose,
-                    icon: const Icon(Icons.close),
+                for (final file in _pendingFiles)
+                  _AttachmentChip(
+                    label: file.name,
+                    isPdf: file.extension?.toLowerCase() == 'pdf',
+                    pending: true,
+                    onRemove: () => setState(() => _pendingFiles.remove(file)),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                enabled: !_isSaving,
-                validator: (_) => _selectedDate == null ? 'Completá la fecha' : null,
-                decoration: const InputDecoration(
-                  labelText: 'Fecha *',
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                  );
-                  if (date != null) {
-                    setState(() {
-                      _selectedDate = date;
-                      _dateController.text = DateFormat('dd/MM/yyyy').format(date);
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _detailController,
-                maxLines: 4,
-                enabled: !_isSaving,
-                decoration: const InputDecoration(
-                  labelText: 'Detalle *',
-                  alignLabelWithHint: true,
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Completá el detalle' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _costController,
-                keyboardType: TextInputType.number,
-                enabled: !_isSaving,
-                inputFormatters: [ThousandsSeparatorFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'Costo',
-                  prefixText: '\$ ',
-                  hintText: 'Opcional',
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Facturas/Archivos',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  _isSelectingFiles
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : TextButton.icon(
-                          onPressed: _isSaving ? null : () async {
-                            setState(() => _isSelectingFiles = true);
-                            try {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-                                allowMultiple: true,
-                              );
-                              if (result != null && result.files.isNotEmpty) {
-                                setState(() {
-                                  _pendingFiles.addAll(result.files);
-                                });
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isSelectingFiles = false);
-                            }
-                          },
-                          icon: const Icon(Icons.attach_file, size: 18),
-                          label: const Text('Adjuntar'),
-                        ),
-                ],
-              ),
-              // Mostrar facturas existentes (solo en edición)
-              if (_existingInvoices.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const Text('Adjuntos guardados (tocá para abrir):', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _existingInvoices.map((invoice) => GestureDetector(
-                    onTap: () {
-                      if (invoice.isPdf) {
-                        _showPdfPreview(context, invoice.cloudinaryUrl, invoice.fileName);
-                      } else {
-                        _showFullScreenImage(context, invoice.cloudinaryUrl);
-                      }
-                    },
-                    child: Chip(
-                      avatar: Icon(
-                        invoice.isPdf ? Icons.picture_as_pdf : Icons.image,
-                        size: 18,
-                        color: invoice.isPdf ? Colors.red : AppTheme.accentPrimary,
-                      ),
-                      label: Text(
-                        invoice.fileName ?? 'Archivo',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onDeleted: _isSaving ? null : () async {
-                        if (!await confirmDelete(context,
-                            title: 'Eliminar factura',
-                            message: '¿Eliminar esta factura? No se puede deshacer.')) {
-                          return;
-                        }
-                        if (!mounted) return;
-                        final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
-                        await maintenanceRepo.deleteInvoice(invoice.id!);
-                        if (!mounted) return;
-                        setState(() {
-                          _existingInvoices.remove(invoice);
-                        });
-                        ref.invalidate(maintenancesByVehicleProvider(widget.vehicleId));
-                      },
-                    ),
-                  )).toList(),
-                ),
               ],
-              // Mostrar archivos pendientes
-              if (_pendingFiles.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const Text('Pendientes de subir:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _pendingFiles.map((file) {
-                    final isPdf = file.extension?.toLowerCase() == 'pdf';
-                    return Chip(
-                      avatar: Icon(
-                        isPdf ? Icons.picture_as_pdf : Icons.image,
-                        size: 18,
-                        color: isPdf ? Colors.red : AppTheme.accentPrimary,
-                      ),
-                      label: Text(
-                        file.name.length > 15 ? '${file.name.substring(0, 15)}...' : file.name,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      backgroundColor: AppTheme.warning.withValues(alpha: 0.2),
-                      onDeleted: _isSaving ? null : () {
-                        setState(() {
-                          _pendingFiles.remove(file);
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  child: _isSaving
-                      ? const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                            SizedBox(width: 12),
-                            Text('Guardando...'),
-                          ],
-                        )
-                      : Text(_isEditing ? 'Guardar' : 'Agregar'),
+            ),
+            if (_isEditing) ...[
+              const Gap(Space.s4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: AppButtonStyles.dangerText(context),
+                  onPressed: _isSaving
+                      ? null
+                      : () => Navigator.pop(context, _SheetOutcome.delete),
+                  icon: const Icon(Icons.delete_rounded),
+                  label: const Text('Eliminar mantenimiento'),
                 ),
               ),
             ],
-          ),
-          ),
+          ],
         ),
       ),
     );
   }
 
+  Future<void> _pickFiles() async {
+    setState(() => _isSelectingFiles = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        allowMultiple: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        setState(() => _pendingFiles.addAll(result.files));
+      }
+    } finally {
+      if (mounted) setState(() => _isSelectingFiles = false);
+    }
+  }
+
+  /// Irreversible: el archivo se borra también de la nube.
+  Future<void> _deleteInvoice(MaintenanceInvoice invoice) async {
+    if (!await confirmDestructive(
+      context,
+      title: '¿Eliminar este adjunto?',
+      message: 'Se borra del mantenimiento y de la nube. No se puede deshacer.',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    await ref.read(maintenanceRepositoryProvider).deleteInvoice(invoice.id!);
+    if (!mounted) return;
+    setState(() => _existingInvoices.remove(invoice));
+    ref.invalidate(maintenancesByVehicleProvider(widget.vehicleId));
+  }
+
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final formValid = _formKey.currentState?.validate() ?? false;
+    if (_selectedDate == null) {
+      setState(() => _dateError = 'Elegí la fecha del mantenimiento');
+    }
+    if (!formValid || _selectedDate == null) return;
 
     setState(() => _isSaving = true);
-
     try {
       final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
       final cost = _costController.text.trim().isEmpty
           ? null
           : double.tryParse(_costController.text.replaceAll('.', ''));
-      String maintenanceId;
+      final String maintenanceId;
 
       if (_isEditing) {
         await maintenanceRepo.updateMaintenance(
           widget.maintenance!.copyWith(
             date: _selectedDate,
-            detail: _detailController.text,
+            detail: _detailController.text.trim(),
             cost: cost,
           ),
         );
@@ -449,139 +403,45 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
         maintenanceId = await maintenanceRepo.insertMaintenance(Maintenance(
           vehicleId: widget.vehicleId,
           date: _selectedDate!,
-          detail: _detailController.text,
+          detail: _detailController.text.trim(),
           cost: cost,
         ));
       }
 
-      // Subir archivos pendientes
-      if (_pendingFiles.isNotEmpty) {
-        final cloudinary = CloudinaryService.instance;
-        for (final file in _pendingFiles) {
-          if (file.path == null) continue;
-          final isPdf = file.extension?.toLowerCase() == 'pdf';
-          final result = await cloudinary.uploadFile(
-            File(file.path!),
-            isPdf: isPdf,
-            fileName: file.name,
-          );
-          if (result != null) {
-            await maintenanceRepo.insertInvoice(MaintenanceInvoice(
-              maintenanceId: maintenanceId,
-              cloudinaryUrl: result.url,
-              cloudinaryPublicId: result.publicId,
-              fileType: result.isPdf ? InvoiceFileType.pdf : InvoiceFileType.image,
-              fileName: result.fileName,
-            ));
-          }
-        }
-      }
+      await _uploadPendingFiles(maintenanceId);
 
       ref.invalidate(maintenancesByVehicleProvider(widget.vehicleId));
+      if (mounted) Navigator.pop(context, _SheetOutcome.saved);
+    } catch (_) {
       if (mounted) {
-        Navigator.pop(context);
-        widget.onSaved(_isEditing ? 'Mantenimiento actualizado' : 'Mantenimiento agregado');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
-        );
+        AppSnack.error(
+            context, 'No se pudo guardar el mantenimiento. Revisá la conexión.');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
-}
 
-class _MaintenanceCard extends StatelessWidget {
-  final Maintenance maintenance;
-  final DateFormat dateFormat;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-
-  const _MaintenanceCard({
-    required this.maintenance,
-    required this.dateFormat,
-    required this.onTap,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentPrimary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.build, color: AppTheme.accentPrimary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dateFormat.format(maintenance.date),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      if (maintenance.invoices.isNotEmpty)
-                        Text(
-                          '${maintenance.invoices.length} adjunto(s)',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (maintenance.cost != null && maintenance.cost! > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Text(
-                      AppFormats.money(maintenance.cost!),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.accentPrimary,
-                      ),
-                    ),
-                  ),
-                IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline,
-                      color: AppTheme.error, size: 20),
-                  tooltip: 'Eliminar mantenimiento',
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              maintenance.detail,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-                height: 1.4,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-      ),
-    );
+  Future<void> _uploadPendingFiles(String maintenanceId) async {
+    final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
+    final cloudinary = CloudinaryService.instance;
+    for (final file in _pendingFiles) {
+      if (file.path == null) continue;
+      final isPdf = file.extension?.toLowerCase() == 'pdf';
+      final result = await cloudinary.uploadFile(
+        File(file.path!),
+        isPdf: isPdf,
+        fileName: file.name,
+      );
+      if (result != null) {
+        await maintenanceRepo.insertInvoice(MaintenanceInvoice(
+          maintenanceId: maintenanceId,
+          cloudinaryUrl: result.url,
+          cloudinaryPublicId: result.publicId,
+          fileType: result.isPdf ? InvoiceFileType.pdf : InvoiceFileType.image,
+          fileName: result.fileName,
+        ));
+      }
+    }
   }
 }

@@ -61,6 +61,7 @@ class AppTextField extends StatelessWidget {
   final String? initialValue;
   final String? hint;
   final IconData? icon;
+  final String? prefixText;
   final String? suffixText;
   final Widget? suffix;
   final String? helper;
@@ -85,6 +86,7 @@ class AppTextField extends StatelessWidget {
     this.initialValue,
     this.hint,
     this.icon,
+    this.prefixText,
     this.suffixText,
     this.suffix,
     this.helper,
@@ -130,6 +132,7 @@ class AppTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: icon == null ? null : Icon(icon, size: Sizes.iconMd),
+            prefixText: prefixText,
             suffixText: suffixText,
             suffixIcon: suffix,
             helper: helper == null

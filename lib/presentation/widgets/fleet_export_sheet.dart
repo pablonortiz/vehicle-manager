@@ -32,13 +32,13 @@ Future<void> showFleetExportSheet(BuildContext context) async {
   final count = request.vehicles.length;
   await runPdfExport(
     context,
-    progressTitle: 'Generando listado...',
+    progressTitle: 'Generando el listado…',
     progressSubtitle: count == 1
         ? 'Armando el PDF con 1 vehículo'
         : 'Armando el PDF con $count vehículos',
     fileName: request.scope.fileName(DateTime.now()),
     successMessage: 'Listado exportado',
-    errorPrefix: 'Error al generar el listado',
+    errorMessage: 'No se pudo generar el listado. Probá de nuevo.',
     generate: () => FleetReportPdf.generate(
       vehicles: request.vehicles,
       scope: request.scope,
