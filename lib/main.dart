@@ -8,9 +8,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/config/supabase_config.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_component_themes.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/router.dart';
 import 'data/services/db_change_service.dart';
@@ -52,8 +55,9 @@ void main() {
       debugPrint('No se pudo cargar .env, se continúa sin config remota: $e');
     }
 
-    // Inicializar locale para fechas en español
-    await initializeDateFormatting('es', null);
+    // Fechas y números en español de Argentina (separador de miles con punto).
+    await initializeDateFormatting('es_AR', null);
+    Intl.defaultLocale = 'es_AR';
 
     // Inicializar Supabase (solo si está configurado)
     if (SupabaseConfig.isConfigured) {
@@ -63,16 +67,6 @@ void main() {
         debugPrint('Error inicializando Supabase: $e');
       }
     }
-
-    // Configurar barra de estado transparente
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: AppTheme.surface,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-    );
 
     final prefs = await SharedPreferences.getInstance();
 
@@ -143,9 +137,9 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
-      locale: const Locale('es', 'ES'),
+      locale: const Locale('es', 'AR'),
       supportedLocales: const [
-        Locale('es', 'ES'),
+        Locale('es', 'AR'),
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -161,7 +155,11 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
                 .textScaler
                 .clamp(minScaleFactor: 0.85, maxScaleFactor: 1.3),
           ),
-          child: OfflineBanner(child: child!),
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: AppComponentThemes.overlayStyle(
+                context.colors, Theme.of(context).brightness),
+            child: OfflineBanner(child: child!),
+          ),
         );
       },
     );
