@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../domain/expiry_status.dart';
 import 'package:uuid/uuid.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
@@ -292,8 +293,10 @@ class VehicleRepository with SyncableRepository {
   Future<List<Vehicle>> getVehiclesWithExpiringDocuments() async {
     final db = await _dbHelper.database;
     final now = DateTime.now().millisecondsSinceEpoch;
+    // Un día de margen: la ventana exacta (30 días de calendario) la decide
+    // ExpiryStatus al filtrar, así todas las pantallas cuentan igual.
     final thirtyDaysLater = DateTime.now()
-        .add(const Duration(days: 30))
+        .add(const Duration(days: ExpiryStatus.warningDays + 1))
         .millisecondsSinceEpoch;
     
     final maps = await db.rawQuery('''
@@ -305,7 +308,10 @@ class VehicleRepository with SyncableRepository {
       ORDER BY vtv_expiry ASC, insurance_expiry ASC
     ''', [now, thirtyDaysLater, now, thirtyDaysLater, now, now]);
     
-    return maps.map((map) => Vehicle.fromMap(map)).toList();
+    return maps
+        .map((map) => Vehicle.fromMap(map))
+        .where((vehicle) => vehicle.expiringDocuments.isNotEmpty)
+        .toList();
   }
 
   // Historial

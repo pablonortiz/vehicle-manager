@@ -19,6 +19,7 @@ class VehicleListTile extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool showExpiryAlert;
+  final EdgeInsetsGeometry contentPadding;
 
   const VehicleListTile({
     super.key,
@@ -26,7 +27,17 @@ class VehicleListTile extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.showExpiryAlert = true,
+    this.contentPadding = cardPadding,
   });
+
+  /// Dentro de una `AppCard.list`.
+  static const cardPadding = EdgeInsets.symmetric(
+    horizontal: Space.s4,
+    vertical: Space.s3,
+  );
+
+  /// Dentro de un sheet, que ya tiene su margen lateral.
+  static const inSheetPadding = EdgeInsets.symmetric(vertical: Space.s3);
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +54,7 @@ class VehicleListTile extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 72),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.s4,
-            vertical: Space.s3,
-          ),
+          padding: contentPadding,
           child: Row(
             children: [
               VehicleIcon(type: vehicle.type, paint: vehicle.color),
