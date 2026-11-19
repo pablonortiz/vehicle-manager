@@ -158,7 +158,7 @@ class _PaintOption extends StatelessWidget {
             dimension: Sizes.touchMin,
             child: Center(
               child: AnimatedContainer(
-                duration: Motion.short,
+                duration: Motion.of(context, Motion.short),
                 width: 40,
                 height: 40,
                 padding: EdgeInsets.all(selected ? 3 : 1),

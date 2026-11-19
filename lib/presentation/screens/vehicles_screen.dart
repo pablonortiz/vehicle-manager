@@ -59,7 +59,7 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
     Scrollable.ensureVisible(
       chipContext,
       alignment: 0.5,
-      duration: Motion.short,
+      duration: Motion.of(context, Motion.short),
     );
   }
 

@@ -92,7 +92,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
         if (sectionContext == null || !sectionContext.mounted) continue;
         await Scrollable.ensureVisible(
           sectionContext,
-          duration: Motion.medium,
+          duration: Motion.of(context, Motion.medium),
           alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
         );
       }

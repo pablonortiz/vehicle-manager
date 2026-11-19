@@ -113,7 +113,7 @@ class _LocationAutocompleteState<T> extends State<LocationAutocomplete<T>> {
       Scrollable.ensureVisible(
         context,
         alignment: 0.1,
-        duration: Motion.medium,
+        duration: Motion.of(context, Motion.medium),
       );
     });
   }

@@ -47,6 +47,10 @@ abstract final class Sizes {
 abstract final class Motion {
   static const Duration short = Duration(milliseconds: 200);
   static const Duration medium = Duration(milliseconds: 300);
+
+  /// [duration], o nada si el sistema pide reducir el movimiento.
+  static Duration of(BuildContext context, Duration duration) =>
+      MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
 }
 
 /// Espacio fijo entre hijos de un `Row` o `Column`, siempre de la escala [Space].

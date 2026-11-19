@@ -28,7 +28,7 @@ class AppFormState extends State<AppForm> {
         (field, other) => _topOf(field) <= _topOf(other) ? field : other);
     Scrollable.ensureVisible(
       topmost.context,
-      duration: Motion.medium,
+      duration: Motion.of(context, Motion.medium),
       alignment: 0.2,
     );
     return false;
