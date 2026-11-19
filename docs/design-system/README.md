@@ -37,8 +37,8 @@ Términos fijos:
 Formatos:
 
 - **Patente**: mayúsculas con el espacio del formato: `AE 472 KP`, `OXN 318`, `A 041 TRB`.
-- **Moneda**: `$ 1.284.500` con espacio y separador de miles `es_AR`; decimales solo en precio por litro (`$ 1.289,50`).
-- **Fecha**: `12 dic 2026` en lectura; `12/12/2026` solo dentro de un campo en edición; con hora `12 dic, 14:30`. Relativa para vencimientos: "Vence en 23 días", "Vencido hace 3 días".
+- **Moneda**: `$ 1.284.500` con espacio y separador de miles `es_AR`; decimales solo en precio por litro (`$ 1.289,50`); en ejes de gráficos, compacta: `$ 250 mil`, `$ 1,25 M`.
+- **Fecha**: `12 dic 2026` en lectura; `12/12/2026` solo dentro de un campo en edición; con hora `12 dic, 14:30` (con el año si no es el actual). Relativa para vencimientos: "Vence en 23 días", "Vencido hace 3 días".
 - **Unidades**: `84.300 km`, `42,500 L` (tres decimales), `11,2 km/L`.
 - **Locale**: `es_AR`.
 
