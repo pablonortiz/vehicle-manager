@@ -129,12 +129,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   Future<bool> _confirmDiscard() async {
     if (!_hasChanges) return true;
-    return confirmDelete(
-      context,
-      title: 'Descartar cambios',
-      message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
-      confirmLabel: 'Descartar',
-    );
+    return confirmDiscard(context);
   }
 
   Future<void> _attemptClose() async {
@@ -916,12 +911,7 @@ class _StickyVehicleHeader extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           
-          VehicleIcon(
-            type: type,
-            vehicleColor: color,
-            status: status,
-            size: 48,
-          ),
+          VehicleIcon(type: type, paint: color),
           const SizedBox(width: 16),
           
           Expanded(

@@ -136,13 +136,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                 title: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    VehicleIcon(
-                      type: vehicle.type,
-                      vehicleColor: vehicle.color,
-                      status: vehicle.status,
-                      size: 36,
-                      showStatusBadge: false,
-                    ),
+                    VehicleIcon(type: vehicle.type, paint: vehicle.color),
                     const SizedBox(width: 12),
                     Flexible(
                       child: Column(
@@ -217,9 +211,8 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                             const SizedBox(height: 50),
                             VehicleIcon(
                               type: vehicle.type,
-                              vehicleColor: vehicle.color,
-                              status: vehicle.status,
-                              size: 72,
+                              paint: vehicle.color,
+                              large: true,
                             ),
                             const SizedBox(height: 10),
                             Text(

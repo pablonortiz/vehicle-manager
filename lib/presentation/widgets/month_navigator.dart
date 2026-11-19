@@ -1,68 +1,74 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
-import '../providers/fuel_charge_provider.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
+import '../providers/fuel_charge_provider.dart';
+import 'app_date_field.dart';
+
+/// Selector de mes con anterior y siguiente (48×48, con tooltip). Tocar el mes
+/// abre un selector de mes y año cuando hay [onSelectMonth].
 class MonthNavigator extends StatelessWidget {
   final SelectedMonthState selectedMonth;
   final VoidCallback onPreviousMonth;
   final VoidCallback onNextMonth;
+  final ValueChanged<SelectedMonthState>? onSelectMonth;
 
   const MonthNavigator({
     super.key,
     required this.selectedMonth,
     required this.onPreviousMonth,
     required this.onNextMonth,
+    this.onSelectMonth,
   });
+
+  Future<void> _pickMonth(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showAppDatePicker(
+      context,
+      initialDate: DateTime(selectedMonth.year, selectedMonth.month),
+      lastDate: now,
+      initialMode: DatePickerMode.year,
+    );
+    if (picked != null) {
+      onSelectMonth!(
+        SelectedMonthState(year: picked.year, month: picked.month),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final isCurrentMonth =
         selectedMonth.year == now.year && selectedMonth.month == now.month;
+    final label = Text(
+      selectedMonth.displayText,
+      style: AppText.titleSm.copyWith(color: context.colors.text),
+    );
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(
-          bottom: BorderSide(color: AppTheme.border),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.s2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
+            tooltip: 'Mes anterior',
             onPressed: onPreviousMonth,
-            icon: const Icon(Icons.chevron_left, color: AppTheme.accentPrimary),
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.surfaceLight,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
-          Text(
-            selectedMonth.displayText,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
+          Flexible(
+            child: onSelectMonth == null
+                ? label
+                : TextButton(
+                    onPressed: () => _pickMonth(context),
+                    child: label,
+                  ),
           ),
           IconButton(
+            tooltip: 'Mes siguiente',
             onPressed: isCurrentMonth ? null : onNextMonth,
-            icon: Icon(
-              Icons.chevron_right,
-              color: isCurrentMonth
-                  ? AppTheme.textSecondary.withValues(alpha: 0.3)
-                  : AppTheme.accentPrimary,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.surfaceLight,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
       ),

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_theme.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
 import '../providers/connectivity_provider.dart';
 
-/// Envuelve la app entera y muestra una barra de "sin conexión" superpuesta
-/// arriba cuando se pierde conectividad. Al estar en MaterialApp.builder cubre
-/// todas las pantallas (shell, formularios y sheets), no solo el home.
+/// Envuelve la app entera (MaterialApp.builder) y, sin conexión, muestra la
+/// barra de aviso debajo de la barra de estado. Ocupa lugar: empuja el
+/// contenido hacia abajo en vez de taparlo. Es el único indicador offline.
 class OfflineBanner extends ConsumerWidget {
   final Widget child;
 
@@ -13,41 +16,62 @@ class OfflineBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Por defecto asumimos online (mientras resuelve) para no parpadear el banner.
+    // Mientras resuelve se asume conexión, para no parpadear el banner.
     final online = ref.watch(isOnlineProvider).valueOrNull ?? true;
 
-    return Stack(
+    // La estructura no cambia con la conexión (y la app va con key): así el
+    // Navigator conserva su pila al aparecer o irse el banner.
+    return Column(
       children: [
-        child,
-        if (!online)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Material(
-                color: AppTheme.warning,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.cloud_off, size: 16, color: Colors.white),
-                      SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'Sin conexión — los cambios se guardan y se sincronizan después',
-                          style: TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
+        if (!online) const _OfflineBar(),
+        Expanded(
+          key: const ValueKey('app'),
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: !online,
+            child: child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OfflineBar extends StatelessWidget {
+  const _OfflineBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: c.warningSoft,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.s5,
+            vertical: Space.s2,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: Sizes.iconSm,
+                color: c.warning,
+              ),
+              const Gap(Space.s2),
+              Expanded(
+                child: Text(
+                  'Sin conexión. Los cambios se guardan y se sincronizan al volver.',
+                  style: AppText.caption.copyWith(color: c.text),
                 ),
               ),
-            ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }

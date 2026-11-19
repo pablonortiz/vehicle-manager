@@ -1,82 +1,83 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/vehicle_constants.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_tokens.dart';
 
+/// Ícono del tipo de vehículo en `text` sobre `surface-raised`, con la muestra
+/// del color físico en la esquina. Nunca se tiñe con el color del vehículo y
+/// no lleva el estado: eso lo comunica el `StatusPill`.
 class VehicleIcon extends StatelessWidget {
   final VehicleType type;
-  final Color vehicleColor;
-  final double size;
-  final VehicleStatus? status;
-  final bool showStatusBadge;
+  final Color paint;
+
+  /// 72 en la cabecera del detalle; 48 en filas.
+  final bool large;
 
   const VehicleIcon({
     super.key,
     required this.type,
-    required this.vehicleColor,
-    this.size = 48,
-    this.status,
-    this.showStatusBadge = true,
+    required this.paint,
+    this.large = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: vehicleColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(size * 0.25),
-            border: Border.all(
-              color: vehicleColor.withValues(alpha: 0.3),
-              width: 1.5,
+    final c = context.colors;
+    final size = large ? 72.0 : 48.0;
+    final glyph = large ? 44.0 : 30.0;
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.surfaceRaised,
+              borderRadius: large ? Radii.lgAll : Radii.mdAll,
             ),
-          ),
-          child: Center(
             child: SvgPicture.asset(
               type.iconAsset,
-              width: size * 0.6,
-              height: size * 0.6,
-              colorFilter: ColorFilter.mode(
-                vehicleColor,
-                BlendMode.srcIn,
-              ),
+              width: glyph,
+              height: glyph,
+              semanticsLabel: type.label,
+              colorFilter: ColorFilter.mode(c.text, BlendMode.srcIn),
             ),
           ),
+          Positioned(right: -5, bottom: -5, child: PaintSwatch(paint)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Muestra circular del color físico con anillo `surface` + `border-strong`,
+/// para que Blanco y Negro se distingan en los dos temas.
+class PaintSwatch extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const PaintSwatch(this.color, {super.key, this.size = 14});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      width: size + 6,
+      height: size + 6,
+      padding: const EdgeInsets.all(1),
+      decoration: BoxDecoration(color: c.borderStrong, shape: BoxShape.circle),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(color: c.surface, shape: BoxShape.circle),
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        if (showStatusBadge && status != null)
-          Positioned(
-            right: -4,
-            top: -4,
-            child: Container(
-              width: size * 0.35,
-              height: size * 0.35,
-              decoration: BoxDecoration(
-                color: status!.color,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppTheme.background,
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: status!.color.withValues(alpha: 0.4),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                status!.icon,
-                size: size * 0.18,
-                color: Colors.white,
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }

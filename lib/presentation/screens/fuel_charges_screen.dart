@@ -155,7 +155,7 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                             padding: const EdgeInsets.all(32),
                             child: EmptyState(
                               icon: Icons.local_gas_station_outlined,
-                              message: 'No hay cargas este mes',
+                              title: 'No hay cargas este mes',
                               actionLabel: 'Agregar carga',
                               onAction: () => _showFuelChargeForm(null),
                             ),

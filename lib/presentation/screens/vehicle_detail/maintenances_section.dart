@@ -60,7 +60,7 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
         if (maintenances.isEmpty)
           EmptyState(
             icon: Icons.build_outlined,
-            message: 'Sin mantenimientos registrados',
+            title: 'Sin mantenimientos registrados',
             actionLabel: 'Agregar mantenimiento',
             onAction: () => _showMaintenanceDialog(null),
           )
@@ -190,12 +190,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   Future<void> _attemptClose() async {
     final dirty = _hasChanges || _pendingFiles.isNotEmpty;
     if (dirty) {
-      final discard = await confirmDelete(
-        context,
-        title: 'Descartar cambios',
-        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
-        confirmLabel: 'Descartar',
-      );
+      final discard = await confirmDiscard(context);
       if (!discard) return;
     }
     if (mounted) Navigator.pop(context);

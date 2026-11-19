@@ -284,12 +284,7 @@ class _SearchResultCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            VehicleIcon(
-              type: vehicle.type,
-              vehicleColor: vehicle.color,
-              status: vehicle.status,
-              size: 50,
-            ),
+            VehicleIcon(type: vehicle.type, paint: vehicle.color),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

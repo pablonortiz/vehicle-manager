@@ -62,7 +62,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
         if (widget.photos.isEmpty && !_isUploading)
           EmptyState(
             icon: Icons.photo_library_outlined,
-            message: 'Sin fotos',
+            title: 'Sin fotos',
             actionLabel: 'Agregar foto',
             onAction: _addPhoto,
           )

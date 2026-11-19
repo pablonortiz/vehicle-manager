@@ -255,12 +255,7 @@ class _VehicleCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            VehicleIcon(
-              type: vehicle.type,
-              vehicleColor: vehicle.color,
-              status: vehicle.status,
-              size: 56,
-            ),
+            VehicleIcon(type: vehicle.type, paint: vehicle.color),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

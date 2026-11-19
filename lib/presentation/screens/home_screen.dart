@@ -213,9 +213,9 @@ class HomeScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
                   child: EmptyState(
-                    icon: Icons.directions_car_outlined,
-                    message:
-                        'Todavía no cargaste ningún vehículo.\nEmpezá agregando el primero.',
+                    icon: Icons.directions_car_rounded,
+                    title: 'Todavía no cargaste ningún vehículo',
+                    message: 'Empezá agregando el primero.',
                     actionLabel: 'Agregar vehículo',
                     onAction: () => context.push('/vehicle/new'),
                   ),

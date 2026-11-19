@@ -43,7 +43,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
         if (notes.isEmpty)
           EmptyState(
             icon: Icons.note_outlined,
-            message: 'Sin notas',
+            title: 'Sin notas',
             actionLabel: 'Agregar nota',
             onAction: () => _showNoteDialog(null),
           )
@@ -156,12 +156,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
     final dirty =
         _hasChanges || _pendingPhotos.isNotEmpty || _pendingFiles.isNotEmpty;
     if (dirty) {
-      final discard = await confirmDelete(
-        context,
-        title: 'Descartar cambios',
-        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
-        confirmLabel: 'Descartar',
-      );
+      final discard = await confirmDiscard(context);
       if (!discard) return;
     }
     if (mounted) Navigator.pop(context);

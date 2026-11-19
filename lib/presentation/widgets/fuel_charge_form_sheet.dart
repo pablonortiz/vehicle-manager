@@ -110,12 +110,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
 
   Future<void> _attemptClose() async {
     if (_hasChanges) {
-      final discard = await confirmDelete(
-        context,
-        title: 'Descartar cambios',
-        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
-        confirmLabel: 'Descartar',
-      );
+      final discard = await confirmDiscard(context);
       if (!discard) return;
     }
     if (mounted) Navigator.pop(context);
