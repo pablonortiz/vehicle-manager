@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/provinces.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../providers/location_provider.dart';
 
-/// "Buenos Aires > La Plata > Depósito" según el filtro de ubicación activo.
+/// "Buenos Aires › La Plata › Depósito" según el filtro de ubicación activo.
 class LocationFilterLabel extends ConsumerWidget {
   final LocationFilter locationFilter;
   final String prefix;
-  final TextStyle style;
+  final TextStyle? style;
   final TextAlign? textAlign;
 
   const LocationFilterLabel({
     super.key,
     required this.locationFilter,
     this.prefix = '',
-    this.style = const TextStyle(fontSize: 14, color: AppTheme.accentPrimary),
+    this.style,
     this.textAlign,
   });
 
@@ -46,8 +47,8 @@ class LocationFilterLabel extends ConsumerWidget {
     }
 
     return Text(
-      '$prefix${parts.join(' > ')}',
-      style: style,
+      '$prefix${parts.join(' › ')}',
+      style: style ?? AppText.body.copyWith(color: context.colors.accent),
       textAlign: textAlign,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
